@@ -17,26 +17,27 @@ builder.Host.UseSerilog();
 
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddControllersWithViews(); // Add MVC views support
 
 // Add Swagger/OpenAPI with custom configuration
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo
+  options.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "DecisionSpark API",
+      Title = "DecisionSpark API",
         Version = "v1",
         Description = "Dynamic Decision Routing Engine - Guides users through minimal questions to recommend optimal outcomes",
-        Contact = new OpenApiContact
-        {
-            Name = "DecisionSpark",
+Contact = new OpenApiContact
+ {
+       Name = "DecisionSpark",
             Url = new Uri("https://github.com/markhazleton/DecisionSpark")
         }
     });
 
     // Add API Key authentication to Swagger UI
     options.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
-    {
+ {
         Type = SecuritySchemeType.ApiKey,
         Name = "X-API-KEY",
         In = ParameterLocation.Header,
@@ -46,19 +47,19 @@ builder.Services.AddSwaggerGen(options =>
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "ApiKey"
-                }
+    new OpenApiSecurityScheme
+          {
+    Reference = new OpenApiReference
+  {
+         Type = ReferenceType.SecurityScheme,
+             Id = "ApiKey"
+          }
             },
             Array.Empty<string>()
         }
     });
 
-    // Include XML comments
+  // Include XML comments
     var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
     if (File.Exists(xmlPath))
@@ -83,19 +84,25 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "DecisionSpark API v1");
-        options.RoutePrefix = string.Empty; // Swagger UI at root
-        options.DocumentTitle = "DecisionSpark API";
-        options.DisplayRequestDuration();
+      options.SwaggerEndpoint("/swagger/v1/swagger.json", "DecisionSpark API v1");
+        options.RoutePrefix = "swagger"; // Move Swagger to /swagger
+   options.DocumentTitle = "DecisionSpark API";
+     options.DisplayRequestDuration();
     });
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles(); // Enable static files
+app.UseRouting(); // Enable routing
 app.UseAuthorization();
 app.MapControllers();
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}"); // Add MVC routing
 
 Log.Information("DecisionSpark API starting...");
-Log.Information("Swagger UI available at: https://localhost:5001");
+Log.Information("Web UI available at: https://localhost:44356");
+Log.Information("Swagger UI available at: https://localhost:44356/swagger");
 
 try
 {

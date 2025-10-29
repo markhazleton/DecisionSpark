@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - DecisionSpark</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+     :root {
+            --primary-color: #0d6efd;
+       --success-color: #198754;
+     --danger-color: #dc3545;
+       --warning-color: #ffc107;
+}
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+         min-height: 100vh;
+        padding: 20px 0;
+        }
+
+        .main-container {
+            max-width: 1200px;
+   margin: 0 auto;
+    }
+
+        .card {
+            border-radius: 15px;
+     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            border: none;
+   margin-bottom: 20px;
+        }
+
+   .card-header {
+     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+       color: white;
+            border-radius: 15px 15px 0 0 !important;
+ padding: 20px;
+        }
+
+    .conversation-area {
+            max-height: 500px;
+    overflow-y: auto;
+      padding: 20px;
+ background-color: #f8f9fa;
+            border-radius: 10px;
+     }
+
+        .message {
+    padding: 15px;
+    border-radius: 10px;
+     margin-bottom: 15px;
+         animation: fadeIn 0.3s ease-in;
+        }
+
+        @@keyframes fadeIn {
+from {
+        opacity: 0;
+    transform: translateY(10px);
+      }
+  to {
+       opacity: 1;
+      transform: translateY(0);
+   }
+        }
+
+        .message.assistant {
+            background-color: #e3f2fd;
+            border-left: 4px solid var(--primary-color);
+        }
+
+ .message.user {
+        background-color: #f1f8e9;
+    border-left: 4px solid var(--success-color);
+        }
+
+     .message.recommendation {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+          border: none;
+    }
+
+        .message.error {
+            background-color: #ffebee;
+   border-left: 4px solid var(--danger-color);
+        }
+
+        .message-label {
+        font-weight: bold;
+   margin-bottom: 5px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+
+.message-content {
+       font-size: 1.1rem;
+  line-height: 1.6;
+   }
+
+        .input-area {
+            background-color: white;
+          border-radius: 10px;
+        padding: 20px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+  .btn-send {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+     padding: 12px 30px;
+ font-weight: bold;
+     transition: transform 0.2s;
+        }
+
+        .btn-send:hover {
+     transform: scale(1.05);
+        }
+
+  .btn-send:disabled {
+            background: #6c757d;
+   transform: none;
+   }
+
+        .recommendation-card {
+            background: white;
+     border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .recommendation-title {
+    font-size: 2rem;
+         font-weight: bold;
+ margin-bottom: 10px;
+     }
+
+        .recommendation-details {
+            padding-left: 20px;
+    }
+
+        .recommendation-details li {
+            margin-bottom: 10px;
+        }
+
+        .badge-session {
+background-color: rgba(255, 255, 255, 0.2);
+    padding: 8px 15px;
+    border-radius: 20px;
+ font-size: 0.9rem;
+        }
+
+   .spinner-border-sm {
+     width: 1rem;
+   height: 1rem;
+        }
+
+        .status-indicator {
+    display: inline-block;
+  width: 10px;
+     height: 10px;
+  border-radius: 50%;
+ margin-right: 5px;
+       animation: pulse 2s infinite;
+        }
+
+        .status-indicator.active {
+ background-color: var(--success-color);
+        }
+
+     .status-indicator.complete {
+            background-color: var(--primary-color);
+        }
+
+        @@keyframes pulse {
+            0%, 100% {
+      opacity: 1;
+            }
+     50% {
+     opacity: 0.5;
+   }
+     }
+
+.quick-actions {
+     display: flex;
+            gap: 10px;
+    flex-wrap: wrap;
+          margin-top: 10px;
+   }
+
+     .quick-action-btn {
+        border-radius: 20px;
+  padding: 5px 15px;
+      font-size: 0.9rem;
+   }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="text-center mb-4">
+<h1 class="text-white display-4 fw-bold">
+    <i class="bi bi-chat-dots-fill"></i> DecisionSpark
+   </h1>
+      <p class="text-white lead">Interactive API Testing Interface</p>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+     <!-- Main Conversation Card -->
+          <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+       <h5 class="mb-0">
+              <i class="bi bi-chat-square-text"></i> Conversation
+    </h5>
+     </div>
+  <div>
+             <span class="badge-session" id="sessionBadge">
+          <i class="bi bi-circle-fill status-indicator" id="statusIndicator"></i>
+          <span id="sessionIdDisplay">Not Started</span>
+      </span>
+     </div>
+  </div>
+            <div class="card-body">
+           <div class="conversation-area" id="conversationArea">
+          <div class="text-center text-muted py-5">
+    <i class="bi bi-chat-dots display-1"></i>
+      <p class="mt-3">Click "Start New Conversation" to begin</p>
+      </div>
+        </div>
+
+         <div class="input-area mt-3" id="inputArea" style="display: none;">
+     <form id="answerForm">
+        <div class="mb-3">
+     <label for="userInput" class="form-label fw-bold">Your Answer:</label>
+         <textarea class="form-control form-control-lg" id="userInput" rows="2" 
+    placeholder="Type your answer here..." required></textarea>
+               <div class="form-text" id="inputHint"></div>
+       </div>
+     <div class="d-flex justify-content-between align-items-center">
+  <div class="quick-actions" id="quickActions"></div>
+           <button type="submit" class="btn btn-primary btn-send" id="sendBtn">
+      <i class="bi bi-send-fill"></i> Send Answer
+     </button>
+       </div>
+     </form>
+            </div>
+            </div>
+   </div>
+            </div>
+
+<div class="col-md-4">
+  <!-- Control Panel -->
+         <div class="card">
+                <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-gear-fill"></i> Controls</h5>
+   </div>
+        <div class="card-body">
+           <button class="btn btn-success w-100 mb-2" id="startBtn" onclick="startConversation()">
+         <i class="bi bi-play-circle-fill"></i> Start New Conversation
+         </button>
+         <button class="btn btn-warning w-100 mb-2" onclick="resetConversation()">
+           <i class="bi bi-arrow-clockwise"></i> Reset
+           </button>
+  <hr>
+    <h6 class="fw-bold">Quick Test Scenarios:</h6>
+     <button class="btn btn-outline-primary w-100 mb-2" onclick="runScenario('bowling')">
+     <i class="bi bi-circle-fill"></i> Bowling Scenario
+       </button>
+       <button class="btn btn-outline-primary w-100 mb-2" onclick="runScenario('movie')">
+     <i class="bi bi-film"></i> Movie Night Scenario
+     </button>
+       <button class="btn btn-outline-primary w-100 mb-2" onclick="runScenario('golf')">
+         <i class="bi bi-flag-fill"></i> Golf Scenario
+    </button>
+      </div>
+       </div>
+
+       <!-- API Info -->
+                <div class="card mt-3">
+             <div class="card-header">
+  <h5 class="mb-0"><i class="bi bi-info-circle-fill"></i> API Info</h5>
+         </div>
+          <div class="card-body">
+        <p class="mb-2"><strong>Base URL:</strong></p>
+             <code class="d-block p-2 bg-light rounded mb-3" id="baseUrlDisplay">@ViewBag.BaseUrl</code>
+        <p class="mb-2"><strong>API Key:</strong></p>
+       <code class="d-block p-2 bg-light rounded mb-3">@ViewBag.ApiKey</code>
+        <div class="d-grid gap-2">
+         <a href="/swagger" class="btn btn-outline-info btn-sm" target="_blank">
+  <i class="bi bi-book"></i> API Documentation
+               </a>
+   <a href="/about" class="btn btn-outline-secondary btn-sm">
+       <i class="bi bi-question-circle"></i> About
+      </a>
+        </div>
+      </div>
+  </div>
+            </div>
+     </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_KEY = '@ViewBag.ApiKey';
+     const BASE_URL = '@ViewBag.BaseUrl';
+        let currentSessionId = null;
+        let currentNextUrl = null;
+
+  // Start a new conversation
+   async function startConversation() {
+    try {
+    showLoading('Starting conversation...');
+           document.getElementById('startBtn').disabled = true;
+
+            const response = await fetch(`${BASE_URL}/start`, {
+       method: 'POST',
+            headers: {
+ 'Content-Type': 'application/json',
+            'X-API-KEY': API_KEY
+        },
+     body: JSON.stringify({})
+         });
+
+         if (!response.ok) {
+  throw new Error(`HTTP error! status: ${response.status}`);
+           }
+
+            const data = await response.json();
+    handleStartResponse(data);
+} catch (error) {
+    console.error('Error starting conversation:', error);
+    addMessage('error', 'Failed to start conversation: ' + error.message);
+        } finally {
+ document.getElementById('startBtn').disabled = false;
+     }
+        }
+
+        // Handle start response
+        function handleStartResponse(data) {
+        clearConversation();
+       
+  // Extract session ID from nextUrl
+if (data.nextUrl) {
+    const matches = data.nextUrl.match(/conversation\/([^\/]+)\//);
+     if (matches) {
+         currentSessionId = matches[1];
+         currentNextUrl = data.nextUrl;
+      updateSessionDisplay(currentSessionId, 'active');
+           }
+            }
+
+     // Display welcome message
+            if (data.texts && data.texts.length > 0) {
+    addMessage('assistant', data.texts.join(' '));
+          }
+
+         // Display question
+     if (data.question) {
+                addMessage('assistant', data.question.text);
+    showInputArea(data.question);
+            }
+
+            // Check if already complete
+          if (data.isComplete) {
+       handleCompletion(data);
+   }
+    }
+
+        // Submit answer
+        document.getElementById('answerForm').addEventListener('submit', async (e) => {
+     e.preventDefault();
+            
+const userInput = document.getElementById('userInput').value.trim();
+         if (!userInput || !currentNextUrl) return;
+
+            try {
+      document.getElementById('sendBtn').disabled = true;
+  document.getElementById('sendBtn').innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+
+          // Show user's answer
+        addMessage('user', userInput);
+      document.getElementById('userInput').value = '';
+
+     // Construct full URL
+                const fullUrl = currentNextUrl.startsWith('http') 
+      ? currentNextUrl 
+   : `${BASE_URL}${currentNextUrl}`;
+
+          const response = await fetch(fullUrl, {
+        method: 'POST',
+    headers: {
+   'Content-Type': 'application/json',
+     'X-API-KEY': API_KEY
+     },
+     body: JSON.stringify({ user_input: userInput })
+   });
+
+    const data = await response.json();
+
+         if (!response.ok) {
+ handleErrorResponse(data);
+        return;
+       }
+
+         handleNextResponse(data);
+        } catch (error) {
+      console.error('Error submitting answer:', error);
+ addMessage('error', 'Failed to submit answer: ' + error.message);
+            } finally {
+         document.getElementById('sendBtn').disabled = false;
+    document.getElementById('sendBtn').innerHTML = '<i class="bi bi-send-fill"></i> Send Answer';
+     }
+        });
+
+   // Handle next response
+        function handleNextResponse(data) {
+   // Update next URL
+        if (data.nextUrl) {
+         currentNextUrl = data.nextUrl;
+            }
+
+      // Display any text messages
+         if (data.texts && data.texts.length > 0) {
+      addMessage('assistant', data.texts.join(' '));
+    }
+
+        // Display question if not complete
+     if (!data.isComplete && data.question) {
+                addMessage('assistant', data.question.text);
+       showInputArea(data.question);
+      }
+
+    // Handle completion
+       if (data.isComplete) {
+                handleCompletion(data);
+   }
+        }
+
+        // Handle error response
+        function handleErrorResponse(data) {
+          if (data.error) {
+    const errorMsg = typeof data.error === 'string' ? data.error : data.error.message;
+     addMessage('error', errorMsg);
+ }
+
+         // Show rephrased question if available
+            if (data.question) {
+  addMessage('assistant', data.question.text);
+         showInputArea(data.question);
+        }
+ }
+
+        // Handle conversation completion
+  function handleCompletion(data) {
+      updateSessionDisplay(currentSessionId, 'complete');
+            document.getElementById('inputArea').style.display = 'none';
+
+  if (data.displayCards && data.displayCards.length > 0) {
+      const card = data.displayCards[0];
+           addRecommendation(card);
+ }
+
+if (data.finalResult) {
+          addMessage('assistant', `? Recommendation complete: ${data.finalResult.outcomeId}`);
+            }
+   }
+
+        // Add message to conversation
+        function addMessage(type, content) {
+            const conversationArea = document.getElementById('conversationArea');
+  
+          // Remove empty state
+       if (conversationArea.querySelector('.text-muted')) {
+   conversationArea.innerHTML = '';
+     }
+
+         const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}`;
+            
+     let icon = '';
+            let label = '';
+            
+          switch(type) {
+ case 'assistant':
+         icon = '<i class="bi bi-robot"></i>';
+          label = 'Assistant';
+            break;
+  case 'user':
+          icon = '<i class="bi bi-person-fill"></i>';
+   label = 'You';
+   break;
+    case 'error':
+         icon = '<i class="bi bi-exclamation-triangle-fill"></i>';
+        label = 'Error';
+    break;
+            case 'recommendation':
+     icon = '<i class="bi bi-star-fill"></i>';
+                    label = 'Recommendation';
+       break;
+            }
+
+  messageDiv.innerHTML = `
+                <div class="message-label">${icon} ${label}</div>
+   <div class="message-content">${escapeHtml(content)}</div>
+            `;
+
+       conversationArea.appendChild(messageDiv);
+      conversationArea.scrollTop = conversationArea.scrollHeight;
+        }
+
+        // Add recommendation card
+        function addRecommendation(card) {
+      const conversationArea = document.getElementById('conversationArea');
+            
+            const recDiv = document.createElement('div');
+    recDiv.className = 'message recommendation';
+         
+         let detailsHtml = '';
+    if (card.bodyText && card.bodyText.length > 0) {
+      detailsHtml = '<ul class="recommendation-details">';
+       card.bodyText.forEach(item => {
+             detailsHtml += `<li>${escapeHtml(item)}</li>`;
+         });
+   detailsHtml += '</ul>';
+            }
+
+            recDiv.innerHTML = `
+            <div class="recommendation-title">${escapeHtml(card.title)}</div>
+     <p class="lead">${escapeHtml(card.subtitle)}</p>
+                <p>${escapeHtml(card.careTypeMessage)}</p>
+              ${detailsHtml}
+            `;
+
+            conversationArea.appendChild(recDiv);
+            conversationArea.scrollTop = conversationArea.scrollHeight;
+      }
+
+        // Show input area with quick actions
+        function showInputArea(question) {
+            const inputArea = document.getElementById('inputArea');
+      inputArea.style.display = 'block';
+       
+        // Set hint based on question type
+         const hintDiv = document.getElementById('inputHint');
+            if (question.allowFreeText) {
+  hintDiv.textContent = 'Answer naturally. Examples: "5 people", "ages: 4, 9, 35, 40"';
+  } else {
+                hintDiv.textContent = 'Select or type your answer';
+ }
+
+     // Add quick action examples
+            const quickActionsDiv = document.getElementById('quickActions');
+            quickActionsDiv.innerHTML = '';
+
+      // Determine example answers based on question ID
+    let examples = [];
+    if (question.id === 'group_size') {
+ examples = ['3', '5 people', '10'];
+            } else if (question.id === 'all_ages') {
+          examples = ['8, 10, 35, 40', '4, 6, 35', '18, 25, 30'];
+     }
+
+          examples.forEach(example => {
+ const btn = document.createElement('button');
+    btn.type = 'button';
+          btn.className = 'btn btn-outline-secondary btn-sm quick-action-btn';
+      btn.textContent = example;
+                btn.onclick = () => {
+    document.getElementById('userInput').value = example;
+                };
+            quickActionsDiv.appendChild(btn);
+   });
+
+        document.getElementById('userInput').focus();
+        }
+
+        // Update session display
+        function updateSessionDisplay(sessionId, status) {
+       const sessionIdDisplay = document.getElementById('sessionIdDisplay');
+        const statusIndicator = document.getElementById('statusIndicator');
+        
+   sessionIdDisplay.textContent = sessionId ? sessionId : 'Not Started';
+            
+  if (status === 'active') {
+                statusIndicator.className = 'status-indicator active';
+            } else if (status === 'complete') {
+       statusIndicator.className = 'status-indicator complete';
+      } else {
+          statusIndicator.className = 'status-indicator';
+            }
+        }
+
+        // Show loading state
+        function showLoading(message) {
+            const conversationArea = document.getElementById('conversationArea');
+       conversationArea.innerHTML = `
+     <div class="text-center text-muted py-5">
+         <div class="spinner-border text-primary mb-3" role="status">
+      <span class="visually-hidden">Loading...</span>
+              </div>
+         <p>${message}</p>
+   </div>
+            `;
+        }
+
+ // Clear conversation
+   function clearConversation() {
+            const conversationArea = document.getElementById('conversationArea');
+          conversationArea.innerHTML = '';
+   document.getElementById('inputArea').style.display = 'none';
+        }
+
+        // Reset conversation
+        function resetConversation() {
+        currentSessionId = null;
+            currentNextUrl = null;
+    clearConversation();
+            updateSessionDisplay(null, '');
+     
+ const conversationArea = document.getElementById('conversationArea');
+ conversationArea.innerHTML = `
+  <div class="text-center text-muted py-5">
+   <i class="bi bi-chat-dots display-1"></i>
+         <p class="mt-3">Click "Start New Conversation" to begin</p>
+        </div>
+            `;
+      }
+
+    // Run predefined scenario
+        async function runScenario(scenarioName) {
+    try {
+   showLoading(`Running ${scenarioName} scenario...`);
+
+ const response = await fetch(`${BASE_URL}/demo/scenario/${scenarioName}`);
+                const data = await response.json();
+
+      clearConversation();
+       updateSessionDisplay(data.sessionId, 'complete');
+
+     // Display conversation history
+ data.conversation.forEach(step => {
+        if (step.question) {
+               addMessage('assistant', step.question);
+    }
+        if (step.answer) {
+          addMessage('user', step.answer);
+  }
+            });
+
+                // Display final recommendation
+        if (data.finalRecommendation) {
+            const card = {
+        title: data.finalRecommendation.title,
+    subtitle: '',
+  careTypeMessage: data.finalRecommendation.description,
+             bodyText: data.finalRecommendation.details
+ };
+  addRecommendation(card);
+        }
+
+       addMessage('assistant', `? Scenario '${scenarioName}' completed successfully`);
+            } catch (error) {
+     console.error('Error running scenario:', error);
+   addMessage('error', 'Failed to run scenario: ' + error.message);
+  }
+        }
+
+ // Utility function to escape HTML
+    function escapeHtml(text) {
+            const div = document.createElement('div');
+       div.textContent = text;
+   return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

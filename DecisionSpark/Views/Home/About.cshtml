@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About - DecisionSpark</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+     min-height: 100vh;
+            padding: 40px 0;
+        }
+        .card {
+     border-radius: 15px;
+   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        border: none;
+            margin-bottom: 20px;
+      }
+        .card-header {
+       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+   border-radius: 15px 15px 0 0 !important;
+        }
+  .feature-icon {
+            font-size: 3rem;
+            color: #667eea;
+     }
+        pre {
+       background-color: #f8f9fa;
+          padding: 15px;
+    border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="text-center mb-4">
+ <h1 class="text-white display-4 fw-bold">
+   <i class="bi bi-info-circle-fill"></i> About DecisionSpark
+       </h1>
+            <p class="text-white lead">Dynamic Decision Routing Engine</p>
+            <a href="/" class="btn btn-light">
+<i class="bi bi-arrow-left"></i> Back to Home
+            </a>
+        </div>
+
+        <div class="row">
+     <div class="col-md-8 mx-auto">
+        <!-- Overview -->
+              <div class="card">
+    <div class="card-header">
+  <h4 class="mb-0"><i class="bi bi-lightbulb-fill"></i> What is DecisionSpark?</h4>
+        </div>
+       <div class="card-body">
+    <p class="lead">
+               DecisionSpark is an intelligent decision routing engine that guides users through 
+          minimal questions to recommend optimal outcomes.
+              </p>
+       <p>
+         Instead of asking users to fill out lengthy forms, DecisionSpark asks just enough 
+         questions to make an informed recommendation, using rule-based evaluation and derived traits.
+              </p>
+          </div>
+           </div>
+
+    <!-- Features -->
+             <div class="card">
+   <div class="card-header">
+      <h4 class="mb-0"><i class="bi bi-star-fill"></i> Key Features</h4>
+        </div>
+       <div class="card-body">
+          <div class="row text-center">
+        <div class="col-md-4 mb-4">
+     <i class="bi bi-chat-dots-fill feature-icon"></i>
+                <h5 class="mt-2">Conversational</h5>
+       <p class="small">Natural language question-answer flow</p>
+       </div>
+   <div class="col-md-4 mb-4">
+         <i class="bi bi-lightning-fill feature-icon"></i>
+         <h5 class="mt-2">Smart Rules</h5>
+      <p class="small">Immediate and conditional rule evaluation</p>
+         </div>
+        <div class="col-md-4 mb-4">
+      <i class="bi bi-graph-up-arrow feature-icon"></i>
+              <h5 class="mt-2">Minimal Questions</h5>
+   <p class="small">Only asks what's needed for a decision</p>
+       </div>
+       <div class="col-md-4 mb-4">
+  <i class="bi bi-gear-fill feature-icon"></i>
+           <h5 class="mt-2">Configurable</h5>
+  <p class="small">JSON-based decision specifications</p>
+  </div>
+  <div class="col-md-4 mb-4">
+    <i class="bi bi-shield-check feature-icon"></i>
+     <h5 class="mt-2">API Secured</h5>
+         <p class="small">API key authentication for production</p>
+   </div>
+           <div class="col-md-4 mb-4">
+       <i class="bi bi-code-square feature-icon"></i>
+        <h5 class="mt-2">HATEOAS</h5>
+ <p class="small">Self-discoverable REST API</p>
+            </div>
+          </div>
+              </div>
+       </div>
+
+<!-- API Endpoints -->
+ <div class="card">
+           <div class="card-header">
+     <h4 class="mb-0"><i class="bi bi-cloud-arrow-up-fill"></i> API Endpoints</h4>
+        </div>
+   <div class="card-body">
+  <h5 class="text-primary">Production API</h5>
+         <table class="table table-sm">
+          <thead>
+           <tr>
+    <th>Method</th>
+             <th>Endpoint</th>
+            <th>Description</th>
+             </tr>
+        </thead>
+      <tbody>
+ <tr>
+               <td><span class="badge bg-success">POST</span></td>
+              <td><code>/start</code></td>
+        <td>Start a new decision session</td>
+   </tr>
+       <tr>
+<td><span class="badge bg-success">POST</span></td>
+           <td><code>/v2/pub/conversation/{id}/next</code></td>
+       <td>Submit answer and get next question</td>
+ </tr>
+          </tbody>
+              </table>
+
+        <h5 class="text-success mt-4">Demo API (No Auth Required)</h5>
+       <table class="table table-sm">
+            <thead>
+       <tr>
+     <th>Method</th>
+         <th>Endpoint</th>
+        <th>Description</th>
+       </tr>
+                </thead>
+            <tbody>
+     <tr>
+   <td><span class="badge bg-info">GET</span></td>
+   <td><code>/demo/start</code></td>
+                 <td>Start demo session</td>
+     </tr>
+          <tr>
+   <td><span class="badge bg-success">POST</span></td>
+      <td><code>/demo/answer/{id}</code></td>
+      <td>Submit answer in demo mode</td>
+           </tr>
+       <tr>
+       <td><span class="badge bg-info">GET</span></td>
+        <td><code>/demo/scenario/{name}</code></td>
+              <td>Run complete test scenario</td>
+            </tr>
+    <tr>
+      <td><span class="badge bg-info">GET</span></td>
+     <td><code>/demo/status/{id}</code></td>
+     <td>Check session status</td>
+         </tr>
+     </tbody>
+              </table>
+              </div>
+          </div>
+
+      <!-- How It Works -->
+<div class="card">
+      <div class="card-header">
+    <h4 class="mb-0"><i class="bi bi-diagram-3-fill"></i> How It Works</h4>
+      </div>
+     <div class="card-body">
+    <ol class="lead">
+     <li><strong>Start Session:</strong> User initiates a conversation</li>
+         <li><strong>Ask Questions:</strong> System asks minimal required questions</li>
+      <li><strong>Parse Input:</strong> Natural language processing extracts values</li>
+              <li><strong>Evaluate Rules:</strong> Decision engine checks immediate and conditional rules</li>
+                <li><strong>Derive Traits:</strong> Calculate additional traits (min, max, count)</li>
+  <li><strong>Recommend:</strong> Provide the best-fit outcome</li>
+         </ol>
+
+   <h5 class="mt-4">Example Flow</h5>
+      <pre><code>User: [Starts conversation]
+System: "How many people are going on the outing?"
+User: "6 people"
+System: "What are the ages of everyone who's going?"
+User: "ages are 8, 10, 12, 35, 37, 40"
+System: ? "Bowling night ?? - Perfect for your crew!"</code></pre>
+    </div>
+     </div>
+
+        <!-- Sample Code -->
+                <div class="card">
+    <div class="card-header">
+   <h4 class="mb-0"><i class="bi bi-code-slash"></i> Sample Code</h4>
+    </div>
+     <div class="card-body">
+            <h5>JavaScript / Fetch API</h5>
+           <pre><code>// Start a conversation
+const response = await fetch('/start', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-KEY': 'your-api-key'
+  },
+  body: JSON.stringify({})
+});
+
+const data = await response.json();
+console.log(data.question.text);
+
+// Submit an answer
+const nextResponse = await fetch(data.nextUrl, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-KEY': 'your-api-key'
+  },
+  body: JSON.stringify({
+  user_input: "6 people"
+  })
+});
+
+const nextData = await nextResponse.json();</code></pre>
+
+  <h5 class="mt-4">C# / HttpClient</h5>
+                   <pre><code>var client = new HttpClient();
+client.DefaultRequestHeaders.Add("X-API-KEY", "your-api-key");
+
+var response = await client.PostAsJsonAsync("/start", new { });
+var data = await response.Content.ReadFromJsonAsync&lt;StartResponse&gt;();
+
+var answerResponse = await client.PostAsJsonAsync(
+    data.NextUrl,
+    new { user_input = "6 people" }
+);</code></pre>
+         </div>
+       </div>
+
+             <!-- Technology Stack -->
+        <div class="card">
+      <div class="card-header">
+<h4 class="mb-0"><i class="bi bi-stack"></i> Technology Stack</h4>
+                 </div>
+     <div class="card-body">
+     <ul class="list-unstyled">
+     <li><strong>? .NET 9</strong> - Latest ASP.NET Core framework</li>
+      <li><strong>? C# 13.0</strong> - Modern C# features</li>
+         <li><strong>? Swagger/OpenAPI</strong> - Interactive API documentation</li>
+ <li><strong>? Serilog</strong> - Structured logging</li>
+          <li><strong>? Bootstrap 5</strong> - Responsive UI framework</li>
+       <li><strong>? JSON-based Configuration</strong> - Easy to modify decision specs</li>
+       </ul>
+   </div>
+             </div>
+
+       <!-- Links -->
+    <div class="card">
+      <div class="card-header">
+       <h4 class="mb-0"><i class="bi bi-link-45deg"></i> Quick Links</h4>
+   </div>
+     <div class="card-body">
+       <div class="d-grid gap-2">
+        <a href="/" class="btn btn-primary">
+            <i class="bi bi-house-fill"></i> Test Interface
+          </a>
+        <a href="/demo" class="btn btn-success">
+ <i class="bi bi-play-circle-fill"></i> Demo Mode
+     </a>
+         <a href="/swagger" class="btn btn-info text-white" target="_blank">
+           <i class="bi bi-book"></i> API Documentation
+   </a>
+      <a href="https://github.com/markhazleton/DecisionSpark" class="btn btn-dark" target="_blank">
+       <i class="bi bi-github"></i> GitHub Repository
+      </a>
+         </div>
+</div>
+   </div>
+     </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
