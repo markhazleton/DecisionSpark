@@ -1,0 +1,6 @@
+@DecisionSpark_HostAddress = http://localhost:5208
+
+GET {{DecisionSpark_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
