@@ -1,0 +1,264 @@
+﻿### DecisionSpark API Tests
+### Basic Start Flow
+### 
+### This file can be used with:
+### - Visual Studio 2022+ (built-in HTTP client)
+### - VS Code with REST Client extension
+### - JetBrains Rider
+###
+
+### Variables
+@baseUrl = https://localhost:44356
+@apiKey = dev-api-key-change-in-production
+@contentType = application/json
+
+###############################################################################
+### Test 1: Start Session
+### Expected: 200 OK with first question (group_size)
+###############################################################################
+
+POST {{baseUrl}}/start
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{}
+
+###############################################################################
+### Test 2: Start Session with HTTP (if HTTPS fails)
+### Expected: 200 OK with first question
+###############################################################################
+
+POST {{baseUrl}}/start
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{}
+
+###############################################################################
+### Test 3: Start Session - Missing API Key
+### Expected: 401 Unauthorized
+###############################################################################
+
+POST {{baseUrl}}/start
+Content-Type: {{contentType}}
+
+{}
+
+###############################################################################
+### Test 4: Start Session - Invalid API Key
+### Expected: 401 Unauthorized
+###############################################################################
+
+POST {{baseUrl}}/start
+Content-Type: {{contentType}}
+X-API-KEY: wrong-key
+
+{}
+
+###############################################################################
+### WORKFLOW: Complete Bowling Flow
+### Instructions:
+### 1. Run Test 1 above
+### 2. Copy the sessionId from the nextUrl (e.g., "abc123")
+### 3. Replace {sessionId} below with your actual session ID
+### 4. Run each test in order
+###############################################################################
+
+###############################################################################
+### Test 5: Answer Group Size (6 people)
+### Expected: 200 OK with next question (all_ages)
+### 
+### BEFORE RUNNING: Replace {sessionId} with actual value from Test 1
+###############################################################################
+
+POST {{baseUrl}}/v2/pub/conversation/{sessionId}/next
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{
+  "user_input": "6 people"
+}
+
+###############################################################################
+### Test 6: Answer Ages - Bowling Scenario
+### Expected: 200 OK with GO_BOWLING outcome
+### 
+### BEFORE RUNNING: Replace {sessionId} with actual value from Test 1
+###############################################################################
+
+POST {{baseUrl}}/v2/pub/conversation/{sessionId}/next
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{
+  "user_input": "ages are 8, 10, 12, 35, 37, 40"
+}
+
+###############################################################################
+### WORKFLOW: Complete Movie Night Flow (Immediate Rule)
+### Instructions:
+### 1. Run Test 1 to start new session
+### 2. Copy new sessionId
+### 3. Replace {sessionId} in tests below
+### 4. Run in order
+###############################################################################
+
+###############################################################################
+### Test 7: New Session for Movie Night
+### Expected: 200 OK with first question
+###############################################################################
+
+POST {{baseUrl}}/start
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{}
+
+###############################################################################
+### Test 8: Answer Group Size (4 people)
+### Expected: 200 OK with ages question
+### 
+### BEFORE RUNNING: Replace {sessionId} with actual value from Test 7
+###############################################################################
+
+POST {{baseUrl}}/v2/pub/conversation/{sessionId}/next
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{
+  "user_input": "4 people"
+}
+
+###############################################################################
+### Test 9: Answer Ages - Movie Night Scenario (min_age < 5)
+### Expected: 200 OK with MOVIE_NIGHT outcome (immediate rule triggered)
+### 
+### BEFORE RUNNING: Replace {sessionId} with actual value from Test 7
+###############################################################################
+
+POST {{baseUrl}}/v2/pub/conversation/{sessionId}/next
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{
+  "user_input": "ages: 3, 6, 35, 37"
+}
+
+###############################################################################
+### ERROR HANDLING TESTS
+###############################################################################
+
+###############################################################################
+### Test 10: Invalid Input (not a number)
+### Expected: 400 Bad Request with error message and rephrased question
+### 
+### Run Test 1 first, then replace {sessionId}
+###############################################################################
+
+POST {{baseUrl}}/v2/pub/conversation/{sessionId}/next
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{
+  "user_input": "I don't know"
+}
+
+###############################################################################
+### Test 11: Session Not Found
+### Expected: 404 Not Found
+###############################################################################
+
+POST {{baseUrl}}/v2/pub/conversation/invalid-session-id/next
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{
+  "user_input": "test"
+}
+
+###############################################################################
+### Test 12: Input Too Large (>2KB)
+### Expected: 413 Payload Too Large
+### 
+### Run Test 1 first, then replace {sessionId}
+###############################################################################
+
+POST {{baseUrl}}/v2/pub/conversation/{sessionId}/next
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{
+  "user_input": "{{$randomString 3000}}"
+}
+
+###############################################################################
+### ADDITIONAL TEST SCENARIOS
+###############################################################################
+
+###############################################################################
+### Test 13: Golfing Scenario (≤4 people, ages 12+)
+### Step 1: Start new session
+###############################################################################
+
+POST {{baseUrl}}/start
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{}
+
+###############################################################################
+### Test 14: Answer Group Size (3 people)
+### BEFORE RUNNING: Replace {sessionId} with value from Test 13
+###############################################################################
+
+POST {{baseUrl}}/v2/pub/conversation/{sessionId}/next
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{
+  "user_input": "3"
+}
+
+###############################################################################
+### Test 15: Answer Ages - Golfing Scenario
+### Expected: 200 OK with GO_GOLFING outcome
+### BEFORE RUNNING: Replace {sessionId} with value from Test 13
+###############################################################################
+
+POST {{baseUrl}}/v2/pub/conversation/{sessionId}/next
+Content-Type: {{contentType}}
+X-API-KEY: {{apiKey}}
+
+{
+  "user_input": "14, 16, 42"
+}
+
+###############################################################################
+### NOTES
+###############################################################################
+# 
+# How to use this file:
+# 
+# Visual Studio 2022+:
+# 1. Make sure the application is running (F5 or dotnet run)
+# 2. Click "Send Request" above any request
+# 3. View response in the panel
+# 
+# VS Code (with REST Client extension):
+# 1. Install "REST Client" extension
+# 2. Make sure the application is running
+# 3. Click "Send Request" link above any request
+# 
+# Tips:
+# - Each ### creates a separator
+# - Variables are defined at the top with @variableName
+# - Use {{variableName}} to reference variables
+# - Replace {sessionId} with actual session ID from responses
+# - Keep sessions in memory only - restart clears all sessions
+# 
+# Expected Outcomes:
+# - Bowling: group_size >= 4, min_age >= 5
+# - Movie Night: min_age < 5 (immediate rule) OR group_size <= 6, min_age < 7
+# - Golfing: group_size <= 4, min_age >= 12
+# 
+###############################################################################
