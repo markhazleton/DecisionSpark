@@ -26,9 +26,9 @@
       "is_pseudo_trait": false,
       "depends_on": ["group_size"],
       "bounds": {
-     "min": 0,
+        "min": 0,
         "max": 120
-   }
+      }
     }
   ],
   "derived_traits": [
@@ -42,43 +42,43 @@
     },
     {
       "key": "adult_count",
-"expression": "count(all_ages >= 18)"
-  }
+      "expression": "count(all_ages >= 18)"
+    }
   ],
   "immediate_select_if": [
     {
       "outcome_id": "MOVIE_NIGHT",
-   "rule": "min_age < 5"
+      "rule": "min_age < 5"
     }
   ],
   "outcomes": [
- {
+    {
       "outcome_id": "GO_BOWLING",
       "selection_rules": [
         "group_size >= 4",
-    "min_age >= 5"
+        "min_age >= 5"
       ],
-   "display_cards": [
+      "display_cards": [
         {
-          "title": "Bowling night ??",
-      "subtitle": "Fun for everyone",
+          "title": "Bowling night 🎳",
+          "subtitle": "Fun for everyone",
           "group_id": "activity_recommendation",
           "care_type_message": "Bowling is a great fit for your group.",
           "icon_url": "https://example.local/icons/bowling.png",
           "body_text": [
- "It's easy for mixed ages.",
-    "You can handle a bigger group."
+            "It's easy for mixed ages.",
+            "You can handle a bigger group."
           ],
-    "care_type_details": [
-       "Look for family lanes or bumpers if you need them.",
-     "Snack bar = instant dinner."
+          "care_type_details": [
+            "Look for family lanes or bumpers if you need them.",
+            "Snack bar = instant dinner."
           ],
-  "rules": [
+          "rules": [
             "Call ahead to reserve a lane if it's Saturday night."
           ]
         }
       ],
-      "care_type_message": "Bowling is perfect for your crew � easy and fun for everyone.",
+      "care_type_message": "Bowling is perfect for your crew — easy and fun for everyone.",
       "final_result": {
         "resolution_button_label": "Reserve a lane",
         "resolution_button_url": "https://example.local/bowling",
@@ -86,70 +86,70 @@
       }
     },
     {
-    "outcome_id": "MOVIE_NIGHT",
-   "selection_rules": [
+      "outcome_id": "MOVIE_NIGHT",
+      "selection_rules": [
         "group_size <= 6",
-  "min_age < 7"
+        "min_age < 7"
       ],
       "display_cards": [
         {
-     "title": "Movie night ??",
-    "subtitle": "Stay in and relax",
-  "group_id": "activity_recommendation",
-          "care_type_message": "Movie night sounds perfect � blankets, snacks, everyone can chill.",
-   "icon_url": "https://example.local/icons/movie.png",
+          "title": "Movie night 🎬",
+          "subtitle": "Stay in and relax",
+          "group_id": "activity_recommendation",
+          "care_type_message": "Movie night sounds perfect — blankets, snacks, everyone can chill.",
+          "icon_url": "https://example.local/icons/movie.png",
           "body_text": [
-      "Young kids can participate without getting overtired.",
-    "You control the pace and environment."
-   ],
+            "Young kids can participate without getting overtired.",
+            "You control the pace and environment."
+          ],
           "care_type_details": [
             "Let everyone vote on the movie.",
-         "Make popcorn or cocoa."
+            "Make popcorn or cocoa."
           ],
           "rules": [
             "Pick something age-appropriate for the youngest kid."
-       ]
+          ]
         }
       ],
       "care_type_message": "Movie night is the best fit for your group.",
       "final_result": {
         "resolution_button_label": "Pick a movie",
- "resolution_button_url": "https://example.local/movies",
-  "analytics_resolution_code": "ROUTE_MOVIE"
+        "resolution_button_url": "https://example.local/movies",
+        "analytics_resolution_code": "ROUTE_MOVIE"
       }
     },
     {
       "outcome_id": "GO_GOLFING",
       "selection_rules": [
         "group_size <= 4",
-     "min_age >= 12"
-],
+        "min_age >= 12"
+      ],
       "display_cards": [
         {
-     "title": "Golf outing ?",
+          "title": "Golf outing ⛳",
           "subtitle": "Fresh air & focus",
-    "group_id": "activity_recommendation",
+          "group_id": "activity_recommendation",
           "care_type_message": "Golfing could be a good fit.",
-      "icon_url": "https://example.local/icons/golf.png",
+          "icon_url": "https://example.local/icons/golf.png",
           "body_text": [
             "Works best with older kids or teens.",
             "Good moderate exercise outdoors."
           ],
           "care_type_details": [
-  "Consider a par-3 course for mixed skill.",
+            "Consider a par-3 course for mixed skill.",
             "Bring water and snacks."
           ],
           "rules": [
-    "Check tee time availability."
+            "Check tee time availability."
           ]
         }
       ],
       "care_type_message": "Golfing suits a smaller, older group.",
       "final_result": {
         "resolution_button_label": "Book a tee time",
-     "resolution_button_url": "https://example.local/golf",
+        "resolution_button_url": "https://example.local/golf",
         "analytics_resolution_code": "ROUTE_GOLF"
-   }
+      }
     }
   ],
   "tie_strategy": {
@@ -159,17 +159,17 @@
       {
         "key": "preference_activity_style",
         "question_text": "Would you rather stay in or go out for an activity tonight?",
-      "answer_type": "enum",
+        "answer_type": "enum",
         "parse_hint": "Map to INDOOR, OUTDOOR, or NO_PREFERENCE",
         "required": false,
         "is_pseudo_trait": true,
-   "options": ["INDOOR", "OUTDOOR", "NO_PREFERENCE"],
+        "options": ["INDOOR", "OUTDOOR", "NO_PREFERENCE"],
         "mapping": {
-    "MOVIE_NIGHT": ["INDOOR"],
+          "MOVIE_NIGHT": ["INDOOR"],
           "GO_BOWLING": ["OUTDOOR"],
           "GO_GOLFING": ["OUTDOOR"]
         }
-  }
+      }
     ],
     "llm_prompt_template": "Given candidate outcomes: {{summaries}} ask ONE neutral question to distinguish them. Output only the question."
   },

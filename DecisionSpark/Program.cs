@@ -81,12 +81,43 @@ Contact = new OpenApiContact
 // Register Decision Engine services
 builder.Services.AddSingleton<ISessionStore, InMemorySessionStore>();
 builder.Services.AddSingleton<IDecisionSpecLoader, FileSystemDecisionSpecLoader>();
+
+// Register OpenAI services
+builder.Services.AddSingleton<IOpenAIService, OpenAIService>();
+
+// Register routing evaluator with OpenAI support
 builder.Services.AddSingleton<IRoutingEvaluator, RoutingEvaluator>();
-builder.Services.AddSingleton<IQuestionGenerator, StubQuestionGenerator>();
+
+// Register question generator - use OpenAI version if available, fallback to stub
+var useOpenAI = builder.Configuration.GetValue<bool>("OpenAI:EnableFallback", true);
+if (useOpenAI)
+{
+    builder.Services.AddSingleton<IQuestionGenerator, OpenAIQuestionGenerator>();
+    Console.WriteLine("[Startup] Using OpenAI-powered question generator");
+}
+else
+{
+    builder.Services.AddSingleton<IQuestionGenerator, StubQuestionGenerator>();
+    Console.WriteLine("[Startup] Using stub question generator");
+}
+
 builder.Services.AddSingleton<IResponseMapper, ResponseMapper>();
+
+// Register trait parser with OpenAI support
 builder.Services.AddSingleton<ITraitParser, TraitParser>();
 
 var app = builder.Build();
+
+// Log OpenAI configuration status
+var openAIService = app.Services.GetRequiredService<IOpenAIService>();
+if (openAIService.IsAvailable())
+{
+    Log.Information("OpenAI service is configured and available");
+}
+else
+{
+    Log.Warning("OpenAI service is not configured - using fallback mode");
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -94,10 +125,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
-      options.SwaggerEndpoint("/swagger/v1/swagger.json", "DecisionSpark API v1");
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "DecisionSpark API v1");
         options.RoutePrefix = "swagger"; // Move Swagger to /swagger
-   options.DocumentTitle = "DecisionSpark API";
-     options.DisplayRequestDuration();
+        options.DocumentTitle = "DecisionSpark API";
+        options.DisplayRequestDuration();
     });
 }
 

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace DecisionSpark.Models.Api;
 
 public class StartRequest
@@ -9,6 +11,7 @@ public class NextRequest
 {
     private string? _userInput;
     
+    [JsonPropertyName("user_input")]
     public string? UserInput 
     { 
         get => _userInput;
@@ -16,9 +19,12 @@ public class NextRequest
         {
             _userInput = value;
             Console.WriteLine($"[NextRequest] UserInput property SET to: '{value ?? "NULL"}' (Length: {value?.Length ?? 0})");
-     }
+        }
     }
-  
+    
+    [JsonPropertyName("selected_option_ids")]
     public List<int>? SelectedOptionIds { get; set; }
+    
+    [JsonPropertyName("selected_option_texts")]
     public List<string>? SelectedOptionTexts { get; set; }
 }
