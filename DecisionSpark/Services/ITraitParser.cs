@@ -301,12 +301,12 @@ Extract the list of integers (comma-separated):";
             }
         }
 
-        // Fallback: return the raw input
-        _logger.LogDebug("Returning raw input for enum: {Input}", input);
+        // Fallback: no valid match found
+        _logger.LogWarning("Could not parse enum value from input: {Input}", input);
         return new TraitParseResult
         {
-            IsValid = true,
-            ExtractedValue = input.ToUpper().Replace(" ", "_")
+            IsValid = false,
+            ErrorReason = "Could not understand your response. Please try rephrasing or choose one of the suggested options."
         };
     }
 
