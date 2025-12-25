@@ -1,3 +1,4 @@
+using DecisionSpark.Common;
 using DecisionSpark.Models.Api;
 using DecisionSpark.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -22,17 +23,17 @@ public class ConversationController : ControllerBase
     private readonly IConfiguration _configuration;
 
     public ConversationController(
-    ILogger<ConversationController> logger,
+        ILogger<ConversationController> logger,
         ISessionStore sessionStore,
         IDecisionSpecLoader specLoader,
-   IRoutingEvaluator evaluator,
+        IRoutingEvaluator evaluator,
         IQuestionGenerator questionGenerator,
         IResponseMapper responseMapper,
-  ITraitParser traitParser,
- IConfiguration configuration)
+        ITraitParser traitParser,
+        IConfiguration configuration)
     {
-_logger = logger;
-   _sessionStore = sessionStore;
+        _logger = logger;
+        _sessionStore = sessionStore;
         _specLoader = specLoader;
         _evaluator = evaluator;
         _questionGenerator = questionGenerator;
@@ -67,9 +68,9 @@ _logger = logger;
     /// <param name="sessionId">Session ID from the previous response's next_url</param>
     /// <param name="request">User's answer</param>
     /// <returns>Next question or final outcome</returns>
-  /// <response code="200">Successfully processed answer</response>
+    /// <response code="200">Successfully processed answer</response>
     /// <response code="400">Invalid input or session state</response>
-    /// <response code="401">Invalid or missing API key</response>
+    /// <response code="401">Invalid or missing API key (handled by middleware)</response>
     /// <response code="404">Session not found</response>
     /// <response code="413">Input too large (>2KB)</response>
     /// <response code="500">Internal server error</response>
@@ -81,140 +82,131 @@ _logger = logger;
     [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<NextResponse>> Next(
-     [FromRoute] string sessionId, 
-    [FromBody][ModelBinder(BinderType = typeof(NextRequestBinder))] NextRequest request)
+        [FromRoute] string sessionId,
+        [FromBody][ModelBinder(BinderType = typeof(NextRequestBinder))] NextRequest request)
     {
-      try
-     {
-    _logger.LogInformation("Next endpoint called for session {SessionId}. Request object null: {IsNull}, UserInput: '{UserInput}'", 
-  sessionId, request == null, request?.UserInput ?? "NULL");
+        try
+        {
+            _logger.LogInformation("Next endpoint called for session {SessionId}. Request object null: {IsNull}, UserInput: '{UserInput}'",
+                sessionId, request == null, request?.UserInput ?? "NULL");
 
-// Validate API key
-         if (!Request.Headers.TryGetValue("X-API-KEY", out var apiKey) || 
-   string.IsNullOrEmpty(apiKey) ||
-   apiKey != _configuration["DecisionEngine:ApiKey"])
-     {
- _logger.LogWarning("Invalid or missing API key for session {SessionId}", sessionId);
-       return Unauthorized(new { error = "Invalid API key" });
+            // Validate input size
+            if (request.UserInput?.Length > Constants.MAX_INPUT_SIZE)
+            {
+                _logger.LogWarning("Input too large for session {SessionId}", sessionId);
+                return StatusCode(413, new { error = Constants.ErrorCodes.INPUT_TOO_LARGE, message = "Input too large" });
             }
 
-  // Validate input size
-if (request.UserInput?.Length > 2048)
- {
-   _logger.LogWarning("Input too large for session {SessionId}", sessionId);
-     return StatusCode(413, new { error = "Input too large" });
-}
+            // Get session
+            var session = await _sessionStore.GetAsync(sessionId);
+            if (session == null)
+            {
+                _logger.LogWarning("Session not found: {SessionId}", sessionId);
+                return NotFound(new { error = Constants.ErrorCodes.SESSION_NOT_FOUND, message = "Session not found" });
+            }
 
- // Get session
-    var session = await _sessionStore.GetAsync(sessionId);
-          if (session == null)
-   {
-        _logger.LogWarning("Session not found: {SessionId}", sessionId);
-    return NotFound(new { error = "Session not found" });
-  }
+            _logger.LogInformation("Processing next for session {SessionId}, awaiting trait {TraitKey}",
+                sessionId, session.AwaitingTraitKey);
 
-      _logger.LogInformation("Processing next for session {SessionId}, awaiting trait {TraitKey}", 
-  sessionId, session.AwaitingTraitKey);
-
-   // Load spec
-   var spec = await _specLoader.LoadActiveSpecAsync(session.SpecId);
+            // Load spec
+            var spec = await _specLoader.LoadActiveSpecAsync(session.SpecId);
 
             // Determine which trait we're expecting
-    var awaitingTraitKey = session.AwaitingTraitKey;
-  if (string.IsNullOrEmpty(awaitingTraitKey))
-         {
-         _logger.LogError("Session {SessionId} has no awaiting trait", sessionId);
-           return BadRequest(new { error = "Session state invalid" });
+            var awaitingTraitKey = session.AwaitingTraitKey;
+            if (string.IsNullOrEmpty(awaitingTraitKey))
+            {
+                _logger.LogError("Session {SessionId} has no awaiting trait", sessionId);
+                return BadRequest(new { error = Constants.ErrorCodes.SESSION_STATE_INVALID, message = "Session state invalid" });
             }
 
-  var traitDef = spec.Traits.FirstOrDefault(t => t.Key == awaitingTraitKey);
-        if (traitDef == null)
-  {
-       _logger.LogError("Trait {TraitKey} not found in spec", awaitingTraitKey);
-       return BadRequest(new { error = "Invalid trait key" });
-     }
+            var traitDef = spec.Traits.FirstOrDefault(t => t.Key == awaitingTraitKey);
+            if (traitDef == null)
+            {
+                _logger.LogError("Trait {TraitKey} not found in spec", awaitingTraitKey);
+                return BadRequest(new { error = Constants.ErrorCodes.SESSION_STATE_INVALID, message = "Invalid trait key" });
+            }
 
-   // Parse the input
-   var parseResult = await _traitParser.ParseAsync(
-      request.UserInput ?? string.Empty,
-    awaitingTraitKey,
-      traitDef.AnswerType,
-     traitDef.ParseHint);
+            // Parse the input
+            var parseResult = await _traitParser.ParseAsync(
+                request.UserInput ?? string.Empty,
+                awaitingTraitKey,
+                traitDef.AnswerType,
+                traitDef.ParseHint);
 
             // Handle invalid input
- if (!parseResult.IsValid)
-   {
- _logger.LogWarning("Invalid input for trait {TraitKey}: {Reason}", awaitingTraitKey, parseResult.ErrorReason);
+            if (!parseResult.IsValid)
+            {
+                _logger.LogWarning("Invalid input for trait {TraitKey}: {Reason}", awaitingTraitKey, parseResult.ErrorReason);
 
-      session.RetryAttempt++;
-    await _sessionStore.SaveAsync(session);
+                session.RetryAttempt++;
+                await _sessionStore.SaveAsync(session);
 
-         var errorQuestionText = await _questionGenerator.GenerateQuestionAsync(spec, traitDef, session.RetryAttempt);
+                var errorQuestionText = await _questionGenerator.GenerateQuestionAsync(spec, traitDef, session.RetryAttempt);
 
-           var errorResponse = new NextResponse
-          {
-     Error = new ErrorDto
-        {
- Code = "INVALID_INPUT",
-     Message = parseResult.ErrorReason ?? "Invalid input"
-    },
-         Question = new QuestionDto
-     {
-        Id = traitDef.Key,
-Source = spec.SpecId,
-     Text = errorQuestionText,
- AllowFreeText = traitDef.AnswerType != "enum",
-       IsFreeText = traitDef.AnswerType != "enum",
-       AllowMultiSelect = false,
-         IsMultiSelect = false,
-          Type = "text",
-       RetryAttempt = session.RetryAttempt
-   },
-         NextUrl = $"{Request.Scheme}://{Request.Host}/conversation/{sessionId}/next"
-   };
+                var errorResponse = new NextResponse
+                {
+                    Error = new ErrorDto
+                    {
+                        Code = Constants.ErrorCodes.INVALID_INPUT,
+                        Message = parseResult.ErrorReason ?? "Invalid input"
+                    },
+                    Question = new QuestionDto
+                    {
+                        Id = traitDef.Key,
+                        Source = spec.SpecId,
+                        Text = errorQuestionText,
+                        AllowFreeText = traitDef.AnswerType != "enum",
+                        IsFreeText = traitDef.AnswerType != "enum",
+                        AllowMultiSelect = false,
+                        IsMultiSelect = false,
+                        Type = "text",
+                        RetryAttempt = session.RetryAttempt
+                    },
+                    NextUrl = $"{Request.Scheme}://{Request.Host}/conversation/{sessionId}/next"
+                };
 
-   return BadRequest(errorResponse);
-  }
+                return BadRequest(errorResponse);
+            }
 
             // Store the parsed value
-      session.KnownTraits[awaitingTraitKey] = parseResult.ExtractedValue!;
-   session.RetryAttempt = 0; // Reset on successful parse
-  _logger.LogInformation("Stored trait {TraitKey} = {Value} for session {SessionId}", 
-     awaitingTraitKey, parseResult.ExtractedValue, sessionId);
+            session.KnownTraits[awaitingTraitKey] = parseResult.ExtractedValue!;
+            session.RetryAttempt = 0; // Reset on successful parse
+            _logger.LogInformation("Stored trait {TraitKey} = {Value} for session {SessionId}",
+                awaitingTraitKey, parseResult.ExtractedValue, sessionId);
 
             // Re-evaluate
             var evaluation = await _evaluator.EvaluateAsync(spec, session.KnownTraits);
 
-     // Generate question if needed
-       string? questionText = null;
-   if (evaluation.NextTraitDefinition != null)
-    {
-        questionText = await _questionGenerator.GenerateQuestionAsync(spec, evaluation.NextTraitDefinition);
-    session.AwaitingTraitKey = evaluation.NextTraitKey;
-         }
-         else
+            // Generate question if needed
+            string? questionText = null;
+            if (evaluation.NextTraitDefinition != null)
             {
-     session.AwaitingTraitKey = null;
-        session.IsComplete = evaluation.IsComplete;
+                questionText = await _questionGenerator.GenerateQuestionAsync(spec, evaluation.NextTraitDefinition);
+                session.AwaitingTraitKey = evaluation.NextTraitKey;
+            }
+            else
+            {
+                session.AwaitingTraitKey = null;
+                session.IsComplete = evaluation.IsComplete;
             }
 
-          // Save session
-     await _sessionStore.SaveAsync(session);
+            // Save session
+            await _sessionStore.SaveAsync(session);
 
-   // Map response with HttpContext
-     _responseMapper.SetHttpContext(HttpContext);
- var answeredCount = session.KnownTraits.Count(kv => spec.Traits.Any(t => t.Key == kv.Key && !t.IsPseudoTrait));
-      var response = _responseMapper.MapToNextResponse(evaluation, session, spec, questionText, answeredCount);
+            // Map response with HttpContext
+            _responseMapper.SetHttpContext(HttpContext);
+            var answeredCount = session.KnownTraits.Count(kv => spec.Traits.Any(t => t.Key == kv.Key && !t.IsPseudoTrait));
+            var response = _responseMapper.MapToNextResponse(evaluation, session, spec, questionText, answeredCount);
 
-        _logger.LogInformation("Session {SessionId} next processed, complete={IsComplete}", 
- sessionId, evaluation.IsComplete);
+            _logger.LogInformation("Session {SessionId} next processed, complete={IsComplete}",
+                sessionId, evaluation.IsComplete);
 
             return Ok(response);
         }
-  catch (Exception ex)
-  {
-   _logger.LogError(ex, "Error in Next endpoint for session {SessionId}", sessionId);
-            return StatusCode(500, new { error = "Internal server error" });
-      }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in Next endpoint for session {SessionId}", sessionId);
+            return StatusCode(500, new { error = Constants.ErrorCodes.INTERNAL_ERROR, message = "Internal server error" });
+        }
     }
 }

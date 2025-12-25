@@ -1,3 +1,4 @@
+using DecisionSpark.Middleware;
 using DecisionSpark.Services;
 using Microsoft.OpenApi.Models;
 using Serilog;
@@ -131,6 +132,10 @@ try
     app.UseHttpsRedirection();
     app.UseStaticFiles();
     app.UseRouting();
+
+    // API Key Authentication - must be after UseRouting and before UseAuthorization
+    app.UseApiKeyAuthentication();
+
     app.UseAuthorization();
 
     app.MapControllers();

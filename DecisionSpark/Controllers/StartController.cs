@@ -23,9 +23,9 @@ public class StartController : ControllerBase
 
     public StartController(
         ILogger<StartController> logger,
-      ISessionStore sessionStore,
+        ISessionStore sessionStore,
         IDecisionSpecLoader specLoader,
-   IRoutingEvaluator evaluator,
+        IRoutingEvaluator evaluator,
         IQuestionGenerator questionGenerator,
         IResponseMapper responseMapper,
         IConfiguration configuration)
@@ -36,7 +36,7 @@ public class StartController : ControllerBase
         _evaluator = evaluator;
         _questionGenerator = questionGenerator;
         _responseMapper = responseMapper;
-     _configuration = configuration;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -56,66 +56,57 @@ public class StartController : ControllerBase
     /// <param name="request">Empty request body (future: may include initial trait values)</param>
     /// <returns>First question or final outcome</returns>
     /// <response code="200">Successfully started session</response>
-    /// <response code="401">Invalid or missing API key</response>
+    /// <response code="401">Invalid or missing API key (handled by middleware)</response>
     /// <response code="500">Internal server error</response>
-  [HttpPost]
+    [HttpPost]
     [ProducesResponseType(typeof(StartResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
- public async Task<ActionResult<StartResponse>> Start([FromBody] StartRequest request)
+    public async Task<ActionResult<StartResponse>> Start([FromBody] StartRequest request)
     {
- try
-    {
-     // Validate API key
-       if (!Request.Headers.TryGetValue("X-API-KEY", out var apiKey) || 
-       string.IsNullOrEmpty(apiKey) ||
-        apiKey != _configuration["DecisionEngine:ApiKey"])
-  {
-    _logger.LogWarning("Invalid or missing API key");
-   return Unauthorized(new { error = "Invalid API key" });
-    }
-
-       // Create session
+        try
+        {
+            // Create session
             var session = new DecisionSession
-{
-   SessionId = Guid.NewGuid().ToString("N").Substring(0, 12),
-     SpecId = _configuration["DecisionEngine:DefaultSpecId"] ?? "FAMILY_SATURDAY_V1",
-             Version = "1.0.0",
-         KnownTraits = new Dictionary<string, object>()
-          };
+            {
+                SessionId = Guid.NewGuid().ToString("N").Substring(0, 12),
+                SpecId = _configuration["DecisionEngine:DefaultSpecId"] ?? "FAMILY_SATURDAY_V1",
+                Version = "1.0.0",
+                KnownTraits = new Dictionary<string, object>()
+            };
 
-     _logger.LogInformation("Starting new session {SessionId} for spec {SpecId}", session.SessionId, session.SpecId);
+            _logger.LogInformation("Starting new session {SessionId} for spec {SpecId}", session.SessionId, session.SpecId);
 
-      // Load spec
-       var spec = await _specLoader.LoadActiveSpecAsync(session.SpecId);
+            // Load spec
+            var spec = await _specLoader.LoadActiveSpecAsync(session.SpecId);
 
-  // Evaluate
-     var evaluation = await _evaluator.EvaluateAsync(spec, session.KnownTraits);
+            // Evaluate
+            var evaluation = await _evaluator.EvaluateAsync(spec, session.KnownTraits);
 
-     // Generate question if needed
-   string? questionText = null;
-       if (evaluation.NextTraitDefinition != null)
- {
-   questionText = await _questionGenerator.GenerateQuestionAsync(spec, evaluation.NextTraitDefinition);
-         session.AwaitingTraitKey = evaluation.NextTraitKey;
+            // Generate question if needed
+            string? questionText = null;
+            if (evaluation.NextTraitDefinition != null)
+            {
+                questionText = await _questionGenerator.GenerateQuestionAsync(spec, evaluation.NextTraitDefinition);
+                session.AwaitingTraitKey = evaluation.NextTraitKey;
             }
 
-         // Save session
-   await _sessionStore.SaveAsync(session);
+            // Save session
+            await _sessionStore.SaveAsync(session);
 
-   // Map response with HttpContext
-      _responseMapper.SetHttpContext(HttpContext);
-    var response = _responseMapper.MapToStartResponse(evaluation, session, spec, questionText);
+            // Map response with HttpContext
+            _responseMapper.SetHttpContext(HttpContext);
+            var response = _responseMapper.MapToStartResponse(evaluation, session, spec, questionText);
 
-  _logger.LogInformation("Session {SessionId} started successfully, complete={IsComplete}", 
- session.SessionId, evaluation.IsComplete);
+            _logger.LogInformation("Session {SessionId} started successfully, complete={IsComplete}",
+                session.SessionId, evaluation.IsComplete);
 
-    return Ok(response);
+            return Ok(response);
         }
-   catch (Exception ex)
+        catch (Exception ex)
         {
- _logger.LogError(ex, "Error in Start endpoint");
- return StatusCode(500, new { error = "Internal server error" });
-      }
+            _logger.LogError(ex, "Error in Start endpoint");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
     }
 }
