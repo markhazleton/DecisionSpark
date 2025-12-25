@@ -1,6 +1,7 @@
 using DecisionSpark.Models.Api;
 using DecisionSpark.Models.Runtime;
 using DecisionSpark.Models.Spec;
+using Microsoft.AspNetCore.Http;
 
 namespace DecisionSpark.Services;
 
@@ -8,35 +9,53 @@ public interface IResponseMapper
 {
  StartResponse MapToStartResponse(EvaluationResult evaluation, DecisionSession session, DecisionSpec spec, string? questionText);
     NextResponse MapToNextResponse(EvaluationResult evaluation, DecisionSession session, DecisionSpec spec, string? questionText, int answeredTraitCount);
+    void SetHttpContext(HttpContext httpContext);
 }
 
 public class ResponseMapper : IResponseMapper
 {
     private readonly ILogger<ResponseMapper> _logger;
+    private HttpContext? _httpContext;
 
     public ResponseMapper(ILogger<ResponseMapper> logger)
     {
  _logger = logger;
     }
 
+    public void SetHttpContext(HttpContext httpContext)
+    {
+        _httpContext = httpContext;
+    }
+
+    private string GetBaseUrl(DecisionSpec spec)
+    {
+        // Use the actual request URL if available, otherwise fall back to spec's canonical URL
+        if (_httpContext != null)
+        {
+            var request = _httpContext.Request;
+          return $"{request.Scheme}://{request.Host}";
+      }
+   return spec.CanonicalBaseUrl;
+    }
+
     public StartResponse MapToStartResponse(EvaluationResult evaluation, DecisionSession session, DecisionSpec spec, string? questionText)
     {
  var response = new StartResponse();
 
-      if (evaluation.IsComplete && evaluation.Outcome != null)
+  if (evaluation.IsComplete && evaluation.Outcome != null)
         {
      MapCompletionResponse(response, evaluation.Outcome, spec);
         }
    else if (evaluation.NextTraitKey != null && evaluation.NextTraitDefinition != null)
      {
    MapQuestionResponse(response, evaluation.NextTraitDefinition, spec, questionText, session);
-   response.NextUrl = $"{spec.CanonicalBaseUrl}/v2/pub/conversation/{session.SessionId}/next";
+response.NextUrl = $"{GetBaseUrl(spec)}/conversation/{session.SessionId}/next";
 }
         else if (evaluation.RequiresClarifier)
         {
        // Tie detected - will be handled by clarifier flow
     response.Texts.Add("I need one more detail to make the best recommendation.");
-        }
+}
 
    return response;
     }
@@ -45,22 +64,22 @@ public class ResponseMapper : IResponseMapper
     {
   var response = new NextResponse();
 
-      if (evaluation.IsComplete && evaluation.Outcome != null)
-        {
+   if (evaluation.IsComplete && evaluation.Outcome != null)
+     {
    MapCompletionResponse(response, evaluation.Outcome, spec);
-        }
+     }
    else if (evaluation.NextTraitKey != null && evaluation.NextTraitDefinition != null)
    {
      MapQuestionResponse(response, evaluation.NextTraitDefinition, spec, questionText, session);
-    response.NextUrl = $"{spec.CanonicalBaseUrl}/v2/pub/conversation/{session.SessionId}/next";
-        
+    response.NextUrl = $"{GetBaseUrl(spec)}/conversation/{session.SessionId}/next";
+      
        if (answeredTraitCount > 0)
             {
-         response.PrevUrl = $"{spec.CanonicalBaseUrl}/v2/pub/conversation/{session.SessionId}/prev";
+  response.PrevUrl = $"{GetBaseUrl(spec)}/conversation/{session.SessionId}/prev";
    }
-        }
+}
  else if (evaluation.RequiresClarifier)
-        {
+ {
   response.Texts.Add("I need one more detail to make the best recommendation.");
    }
 

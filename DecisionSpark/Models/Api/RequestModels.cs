@@ -7,7 +7,18 @@ public class StartRequest
 
 public class NextRequest
 {
-    public string? UserInput { get; set; }
+    private string? _userInput;
+    
+    public string? UserInput 
+    { 
+        get => _userInput;
+        set
+        {
+            _userInput = value;
+            Console.WriteLine($"[NextRequest] UserInput property SET to: '{value ?? "NULL"}' (Length: {value?.Length ?? 0})");
+     }
+    }
+  
     public List<int>? SelectedOptionIds { get; set; }
     public List<string>? SelectedOptionTexts { get; set; }
 }

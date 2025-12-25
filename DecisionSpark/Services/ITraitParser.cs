@@ -24,27 +24,29 @@ public class TraitParser : ITraitParser
     public Task<TraitParseResult> ParseAsync(string userInput, string traitKey, string answerType, string parseHint)
     {
         _logger.LogDebug("Parsing trait {TraitKey} with answer type {AnswerType}", traitKey, answerType);
+        _logger.LogInformation("TraitParser received input: '{UserInput}' (Length: {Length}) for trait {TraitKey}", 
+         userInput ?? "NULL", userInput?.Length ?? 0, traitKey);
 
 try
         {
-     return answerType.ToLower() switch
+ return answerType.ToLower() switch
        {
        "integer" => ParseInteger(userInput, parseHint),
-                "integer_list" => ParseIntegerList(userInput, parseHint),
-                "enum" => ParseEnum(userInput, parseHint),
+        "integer_list" => ParseIntegerList(userInput, parseHint),
+            "enum" => ParseEnum(userInput, parseHint),
     _ => Task.FromResult(new TraitParseResult
-           {
-          IsValid = false,
+       {
+        IsValid = false,
  ErrorReason = $"Unsupported answer type: {answerType}"
      })
  };
         }
  catch (Exception ex)
         {
-            _logger.LogError(ex, "Error parsing trait {TraitKey}", traitKey);
+          _logger.LogError(ex, "Error parsing trait {TraitKey}", traitKey);
             return Task.FromResult(new TraitParseResult
-        {
-         IsValid = false,
+   {
+  IsValid = false,
       ErrorReason = "Unexpected error parsing input"
   });
         }
@@ -52,17 +54,22 @@ try
 
     private Task<TraitParseResult> ParseInteger(string input, string parseHint)
   {
+        _logger.LogInformation("ParseInteger called with input: '{Input}'", input ?? "NULL");
+    
   var numbers = System.Text.RegularExpressions.Regex.Matches(input, @"\d+")
   .Select(m => int.Parse(m.Value))
 .ToList();
 
-        if (numbers.Count == 0)
+        _logger.LogInformation("ParseInteger found {Count} numbers: {Numbers}", 
+            numbers.Count, string.Join(", ", numbers));
+
+  if (numbers.Count == 0)
 {
          return Task.FromResult(new TraitParseResult
         {
       IsValid = false,
   ErrorReason = "Could not find a number in your response."
-            });
+        });
     }
 
         // Take the first or largest number based on hint

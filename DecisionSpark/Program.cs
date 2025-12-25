@@ -16,8 +16,18 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 // Add services to the container.
-builder.Services.AddControllers();
-builder.Services.AddControllersWithViews(); // Add MVC views support
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        Console.WriteLine("[Startup] JSON options configured: PropertyNameCaseInsensitive = true");
+    });
+builder.Services.AddControllersWithViews()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        Console.WriteLine("[Startup] MVC JSON options configured: PropertyNameCaseInsensitive = true");
+    });
 
 // Add Swagger/OpenAPI with custom configuration
 builder.Services.AddEndpointsApiExplorer();
@@ -95,10 +105,11 @@ app.UseHttpsRedirection();
 app.UseStaticFiles(); // Enable static files
 app.UseRouting(); // Enable routing
 app.UseAuthorization();
+
 app.MapControllers();
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}"); // Add MVC routing
+  pattern: "{controller=Home}/{action=Index}/{id?}"); // Add MVC routing
 
 Log.Information("DecisionSpark API starting...");
 Log.Information("Web UI available at: https://localhost:44356");
