@@ -1,3 +1,4 @@
+using DecisionSpark.Models.Api;
 using DecisionSpark.Models.Spec;
 
 namespace DecisionSpark.Services;
@@ -5,6 +6,14 @@ namespace DecisionSpark.Services;
 public interface IQuestionGenerator
 {
     Task<string> GenerateQuestionAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0);
+    Task<QuestionGenerationResult> GenerateQuestionWithOptionsAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0);
+}
+
+public class QuestionGenerationResult
+{
+    public string QuestionText { get; set; } = string.Empty;
+    public List<QuestionOptionDto> Options { get; set; } = new();
+    public QuestionMetadataDto? Metadata { get; set; }
 }
 
 public class StubQuestionGenerator : IQuestionGenerator
@@ -30,5 +39,22 @@ public class StubQuestionGenerator : IQuestionGenerator
         }
 
         return Task.FromResult(question);
+    }
+
+    public Task<QuestionGenerationResult> GenerateQuestionWithOptionsAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0)
+    {
+        var result = new QuestionGenerationResult
+        {
+            QuestionText = trait.QuestionText,
+            Options = new List<QuestionOptionDto>(),
+            Metadata = new QuestionMetadataDto()
+        };
+
+        if (retryAttempt > 0)
+        {
+            result.QuestionText = $"Let me try again. {trait.QuestionText}";
+        }
+
+        return Task.FromResult(result);
     }
 }

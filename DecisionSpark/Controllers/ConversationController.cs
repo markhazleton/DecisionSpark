@@ -21,6 +21,8 @@ public class ConversationController : ControllerBase
     private readonly IResponseMapper _responseMapper;
     private readonly ITraitParser _traitParser;
     private readonly IConfiguration _configuration;
+    private readonly IUserSelectionService _userSelectionService;
+    private readonly IQuestionPresentationDecider _questionPresentationDecider;
 
     public ConversationController(
         ILogger<ConversationController> logger,
@@ -30,7 +32,9 @@ public class ConversationController : ControllerBase
         IQuestionGenerator questionGenerator,
         IResponseMapper responseMapper,
         ITraitParser traitParser,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IUserSelectionService userSelectionService,
+        IQuestionPresentationDecider questionPresentationDecider)
     {
         _logger = logger;
         _sessionStore = sessionStore;
@@ -40,6 +44,8 @@ public class ConversationController : ControllerBase
         _responseMapper = responseMapper;
         _traitParser = traitParser;
         _configuration = configuration;
+        _userSelectionService = userSelectionService;
+        _questionPresentationDecider = questionPresentationDecider;
     }
 
     /// <summary>
@@ -85,6 +91,7 @@ public class ConversationController : ControllerBase
         [FromRoute] string sessionId,
         [FromBody][ModelBinder(BinderType = typeof(NextRequestBinder))] NextRequest request)
     {
+        var startTime = DateTime.UtcNow;
         try
         {
             _logger.LogInformation("Next endpoint called for session {SessionId}. Request object null: {IsNull}, UserInput: '{UserInput}'",
@@ -126,22 +133,70 @@ public class ConversationController : ControllerBase
                 return BadRequest(new { error = Constants.ErrorCodes.SESSION_STATE_INVALID, message = "Invalid trait key" });
             }
 
-            // Parse the input
+            // Get current question type to properly normalize selection
+            var currentQuestionType = _questionPresentationDecider.DecideQuestionType(traitDef, session);
+            
+            // Generate question to get available options for validation
+            var currentQuestionResult = await _questionGenerator.GenerateQuestionWithOptionsAsync(spec, traitDef, session.RetryAttempt);
+            
+            // Normalize user selection (structured options override free text per FR-024a)
+            var normalizedSelection = _userSelectionService.NormalizeSelection(
+                request,
+                currentQuestionType,
+                currentQuestionResult.Options);
+
+            _logger.LogDebug("Normalized selection for trait {TraitKey}: type={QuestionType}, values={Values}, text='{Text}'",
+                awaitingTraitKey, normalizedSelection.QuestionType, 
+                normalizedSelection.SelectedValues != null ? string.Join(",", normalizedSelection.SelectedValues) : "NULL",
+                normalizedSelection.SubmittedText ?? "NULL");
+
+            // Determine the input to parse based on normalization results
+            string inputToParse;
+            if (normalizedSelection.SelectedValues != null && normalizedSelection.SelectedValues.Length > 0)
+            {
+                // Use structured values if available
+                inputToParse = string.Join(", ", normalizedSelection.SelectedValues);
+            }
+            else
+            {
+                // Fall back to submitted text
+                inputToParse = normalizedSelection.SubmittedText ?? request.UserInput ?? string.Empty;
+            }
+
+            // Parse the normalized input
             var parseResult = await _traitParser.ParseAsync(
-                request.UserInput ?? string.Empty,
+                inputToParse,
                 awaitingTraitKey,
                 traitDef.AnswerType,
-                traitDef.ParseHint);
+                traitDef.ParseHint,
+                session);
 
             // Handle invalid input
             if (!parseResult.IsValid)
             {
                 _logger.LogWarning("Invalid input for trait {TraitKey}: {Reason}", awaitingTraitKey, parseResult.ErrorReason);
 
+                // Track validation failure
                 session.RetryAttempt++;
+                session.ValidationHistory.Add(new Models.Runtime.ValidationHistoryEntry
+                {
+                    TraitKey = awaitingTraitKey,
+                    Attempt = session.RetryAttempt,
+                    InputTypeUsed = "text", // Will be enhanced when we track actual input type
+                    ErrorReason = parseResult.ErrorReason ?? "Invalid input",
+                    TimestampUtc = DateTime.UtcNow
+                });
+                
+                var questionType = _questionPresentationDecider.DecideQuestionType(traitDef, session);
                 await _sessionStore.SaveAsync(session);
 
-                var errorQuestionText = await _questionGenerator.GenerateQuestionAsync(spec, traitDef, session.RetryAttempt);
+                var errorQuestionResult = await _questionGenerator.GenerateQuestionWithOptionsAsync(spec, traitDef, session.RetryAttempt);
+
+                // Log telemetry for failed attempt
+                var latency = (DateTime.UtcNow - startTime).TotalMilliseconds;
+                _logger.LogInformation(
+                    "[Telemetry] Session={SessionId}, Trait={TraitKey}, Attempt={Attempt}, Success=false, Latency={Latency}ms, QuestionType={QuestionType}",
+                    sessionId, awaitingTraitKey, session.RetryAttempt, latency, questionType);
 
                 var errorResponse = new NextResponse
                 {
@@ -154,13 +209,15 @@ public class ConversationController : ControllerBase
                     {
                         Id = traitDef.Key,
                         Source = spec.SpecId,
-                        Text = errorQuestionText,
-                        AllowFreeText = traitDef.AnswerType != "enum",
-                        IsFreeText = traitDef.AnswerType != "enum",
-                        AllowMultiSelect = false,
-                        IsMultiSelect = false,
-                        Type = "text",
-                        RetryAttempt = session.RetryAttempt
+                        Text = errorQuestionResult.QuestionText,
+                        AllowFreeText = questionType == "text" || questionType == "multi-select",
+                        IsFreeText = questionType == "text",
+                        AllowMultiSelect = questionType == "multi-select",
+                        IsMultiSelect = questionType == "multi-select",
+                        Type = questionType,
+                        RetryAttempt = session.RetryAttempt,
+                        Options = errorQuestionResult.Options,
+                        Metadata = errorQuestionResult.Metadata
                     },
                     NextUrl = $"{Request.Scheme}://{Request.Host}/conversation/{sessionId}/next"
                 };
@@ -178,10 +235,10 @@ public class ConversationController : ControllerBase
             var evaluation = await _evaluator.EvaluateAsync(spec, session.KnownTraits);
 
             // Generate question if needed
-            string? questionText = null;
+            QuestionGenerationResult? questionResult = null;
             if (evaluation.NextTraitDefinition != null)
             {
-                questionText = await _questionGenerator.GenerateQuestionAsync(spec, evaluation.NextTraitDefinition);
+                questionResult = await _questionGenerator.GenerateQuestionWithOptionsAsync(spec, evaluation.NextTraitDefinition);
                 session.AwaitingTraitKey = evaluation.NextTraitKey;
             }
             else
@@ -196,7 +253,14 @@ public class ConversationController : ControllerBase
             // Map response with HttpContext
             _responseMapper.SetHttpContext(HttpContext);
             var answeredCount = session.KnownTraits.Count(kv => spec.Traits.Any(t => t.Key == kv.Key && !t.IsPseudoTrait));
-            var response = _responseMapper.MapToNextResponse(evaluation, session, spec, questionText, answeredCount);
+            var response = _responseMapper.MapToNextResponse(evaluation, session, spec, questionResult, answeredCount);
+
+            // Log telemetry for successful processing
+            var successLatency = (DateTime.UtcNow - startTime).TotalMilliseconds;
+            var isFirstAttempt = session.RetryAttempt == 0;
+            _logger.LogInformation(
+                "[Telemetry] Session={SessionId}, Trait={TraitKey}, Success=true, FirstAttempt={FirstAttempt}, Latency={Latency}ms, Complete={IsComplete}",
+                sessionId, awaitingTraitKey, isFirstAttempt, successLatency, evaluation.IsComplete);
 
             _logger.LogInformation("Session {SessionId} next processed, complete={IsComplete}",
                 sessionId, evaluation.IsComplete);

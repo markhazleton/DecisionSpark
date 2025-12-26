@@ -84,10 +84,10 @@ public class StartController : ControllerBase
             var evaluation = await _evaluator.EvaluateAsync(spec, session.KnownTraits);
 
             // Generate question if needed
-            string? questionText = null;
+            QuestionGenerationResult? questionResult = null;
             if (evaluation.NextTraitDefinition != null)
             {
-                questionText = await _questionGenerator.GenerateQuestionAsync(spec, evaluation.NextTraitDefinition);
+                questionResult = await _questionGenerator.GenerateQuestionWithOptionsAsync(spec, evaluation.NextTraitDefinition);
                 session.AwaitingTraitKey = evaluation.NextTraitKey;
             }
 
@@ -96,7 +96,7 @@ public class StartController : ControllerBase
 
             // Map response with HttpContext
             _responseMapper.SetHttpContext(HttpContext);
-            var response = _responseMapper.MapToStartResponse(evaluation, session, spec, questionText);
+            var response = _responseMapper.MapToStartResponse(evaluation, session, spec, questionResult);
 
             _logger.LogInformation("Session {SessionId} started successfully, complete={IsComplete}",
                 session.SessionId, evaluation.IsComplete);

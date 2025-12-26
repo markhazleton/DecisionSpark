@@ -32,12 +32,32 @@ public class QuestionDto
     public string Id { get; set; } = string.Empty;
     public string Source { get; set; } = string.Empty;
     public string Text { get; set; } = string.Empty;
- public bool AllowFreeText { get; set; }
+    public bool AllowFreeText { get; set; }
     public bool IsFreeText { get; set; }
     public bool AllowMultiSelect { get; set; }
     public bool IsMultiSelect { get; set; }
     public string Type { get; set; } = string.Empty;
     public int? RetryAttempt { get; set; }
+    public List<QuestionOptionDto> Options { get; set; } = new();
+    public QuestionMetadataDto? Metadata { get; set; }
+}
+
+public class QuestionOptionDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public string Value { get; set; } = string.Empty;
+    public bool IsNegative { get; set; }
+    public bool IsDefault { get; set; }
+    public float? Confidence { get; set; }
+}
+
+public class QuestionMetadataDto
+{
+    public string? LlmReasoning { get; set; }
+    public float? Confidence { get; set; }
+    public bool? AllowFreeText { get; set; }
+    public List<string> ValidationHints { get; set; } = new();
 }
 
 public class DisplayCardDto

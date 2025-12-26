@@ -83,6 +83,11 @@ try
     builder.Services.AddSingleton<IRoutingEvaluator, RoutingEvaluator>();
     builder.Services.AddSingleton<IResponseMapper, ResponseMapper>();
     builder.Services.AddSingleton<ITraitParser, TraitParser>();
+    
+    // Register new services for question type feature
+    builder.Services.AddSingleton<IOptionIdGenerator, OptionIdGenerator>();
+    builder.Services.AddSingleton<IQuestionPresentationDecider, QuestionPresentationDecider>();
+    builder.Services.AddScoped<IUserSelectionService, UserSelectionService>();
 
     // Register question generator - use OpenAI version if available, fallback to stub
     var useOpenAI = builder.Configuration.GetValue<bool>("OpenAI:EnableFallback", true);

@@ -9,7 +9,7 @@ public class TraitParseResult
 
 public interface ITraitParser
 {
-    Task<TraitParseResult> ParseAsync(string userInput, string traitKey, string answerType, string parseHint);
+    Task<TraitParseResult> ParseAsync(string userInput, string traitKey, string answerType, string parseHint, Models.Runtime.DecisionSession? session = null);
 }
 
 public class TraitParser : ITraitParser
@@ -25,11 +25,22 @@ public class TraitParser : ITraitParser
         _openAIService = openAIService;
     }
 
-    public async Task<TraitParseResult> ParseAsync(string userInput, string traitKey, string answerType, string parseHint)
+    public async Task<TraitParseResult> ParseAsync(string userInput, string traitKey, string answerType, string parseHint, Models.Runtime.DecisionSession? session = null)
     {
         _logger.LogDebug("Parsing trait {TraitKey} with answer type {AnswerType}", traitKey, answerType);
         _logger.LogInformation("TraitParser received input: '{UserInput}' (Length: {Length}) for trait {TraitKey}", 
             userInput ?? "NULL", userInput?.Length ?? 0, traitKey);
+        
+        // Log validation history context if available
+        if (session != null)
+        {
+            var previousFailures = session.ValidationHistory?.Count(v => v.TraitKey == traitKey) ?? 0;
+            if (previousFailures > 0)
+            {
+                _logger.LogInformation("Trait {TraitKey} has {FailureCount} previous validation failures", 
+                    traitKey, previousFailures);
+            }
+        }
 
         try
         {

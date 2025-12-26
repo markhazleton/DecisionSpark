@@ -75,6 +75,28 @@ public class NextRequestBinder : IModelBinder
                 return;
             }
 
+            // Validate and log selected_option_ids
+            if (nextRequest.SelectedOptionIds != null && nextRequest.SelectedOptionIds.Length > 0)
+            {
+                // Enforce max 7 options limit per FR-024a
+                if (nextRequest.SelectedOptionIds.Length > 7)
+                {
+                    logger?.LogWarning("[NextRequestBinder] Too many options selected: {Count}. Limiting to first 7.",
+                        nextRequest.SelectedOptionIds.Length);
+                    nextRequest.SelectedOptionIds = nextRequest.SelectedOptionIds.Take(7).ToArray();
+                }
+
+                logger?.LogInformation("[NextRequestBinder] Selected option IDs: [{Ids}]",
+                    string.Join(", ", nextRequest.SelectedOptionIds));
+
+                // Log when custom text is ignored per FR-024a
+                if (!string.IsNullOrWhiteSpace(nextRequest.UserInput))
+                {
+                    logger?.LogInformation("[NextRequestBinder] Custom text ignored when structured selections present: '{UserInput}'",
+                        nextRequest.UserInput);
+                }
+            }
+
             // Reset stream position for any subsequent reads
             request.Body.Position = 0;
 

@@ -100,6 +100,9 @@ components:
       anyOf:
         - required: [user_input]
         - required: [selected_option_ids]
+      example:
+        selected_option_ids: ["option-fever", "option-cough"]
+        user_input: "Also feeling tired"
     NextResponse:
       allOf:
         - $ref: '#/components/schemas/BaseResponse'
@@ -197,6 +200,13 @@ components:
           format: float
           minimum: 0
           maximum: 1
+      example:
+        id: "none-of-the-above"
+        label: "None of the above"
+        value: "none"
+        isNegative: true
+        isDefault: false
+        confidence: 0.9
     QuestionMetadataDto:
       type: object
       properties:
@@ -206,10 +216,20 @@ components:
         confidence:
           type: number
           format: float
+          description: LLM confidence in the question/options (0.0-1.0)
+        allowFreeText:
+          type: boolean
+          description: Whether custom text input is permitted (FR-006)
         validationHints:
           type: array
+          description: Error messages from previous validation attempts
           items:
             type: string
+      example:
+        llmReasoning: "Single selection required per trait configuration"
+        confidence: 0.9
+        allowFreeText: true
+        validationHints: []
     DisplayCardDto:
       type: object
       properties:
