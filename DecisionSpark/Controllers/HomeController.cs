@@ -28,16 +28,6 @@ public class HomeController : Controller
         return View();
     }
 
- /// <summary>
-    /// Demo testing interface (no API key required)
-    /// </summary>
-    [HttpGet("/demo")]
-    public IActionResult Demo()
-    {
-        ViewBag.BaseUrl = $"{Request.Scheme}://{Request.Host}";
-        return View();
-    }
-
     /// <summary>
     /// About page with API documentation
     /// </summary>

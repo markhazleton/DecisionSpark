@@ -24,13 +24,33 @@ DecisionSpark is a .NET 9 Web API that implements a flexible, config-driven deci
 
 ### API Endpoints
 
-#### `POST /start`
+#### `GET /conversation/specs`
+Returns a list of available decision specs.
+
+**Response:**
+```json
+{
+  "specs": [
+    {
+      "specId": "FAMILY_SATURDAY_V1",
+      "fileName": "FAMILY_SATURDAY_V1.0.0.0.active.json",
+      "displayName": "FAMILY SATURDAY V1",
+      "isDefault": true
+    }
+  ]
+}
+```
+
+#### `POST /conversation/start`
 Initializes a decision session and returns the first question or final recommendation.
 
 **Request:**
 ```json
-{}
+{
+  "spec_id": "FAMILY_SATURDAY_V1"
+}
 ```
+*Note: spec_id is optional; defaults to configured DefaultSpecId*
 
 **Response (text question):**
 ```json
@@ -124,7 +144,7 @@ Initializes a decision session and returns the first question or final recommend
 }
 ```
 
-#### `POST /v2/pub/conversation/{sessionId}/next`
+#### `POST /conversation/{sessionId}/next`
 Continues the conversation with user's answer.
 
 **Request (free text):**
@@ -178,13 +198,13 @@ Key sections:
 
 ### Flow
 
-1. **Client calls `/start`**
- - Server creates session
+1. **Client calls `/conversation/start`**
+   - Server creates session
    - Loads active DecisionSpec
    - Evaluates immediate rules
    - Returns first question or outcome
 
-2. **Client POSTs answer to `next_url`**
+2. **Client POSTs answer to `next_url`** (e.g., `/conversation/{sessionId}/next`)
    - Server parses input ? trait value
  - Validates (retry with rephrased question if invalid)
    - Re-evaluates rules
@@ -265,14 +285,18 @@ API will be available at `https://localhost:5001` (or configured port).
 ### Test with curl
 
 ```bash
+# Get available specs
+curl -X GET https://localhost:5001/conversation/specs \
+  -H "X-API-KEY: dev-api-key-change-in-production"
+
 # Start session
-curl -X POST https://localhost:5001/start \
+curl -X POST https://localhost:5001/conversation/start \
   -H "Content-Type: application/json" \
   -H "X-API-KEY: dev-api-key-change-in-production" \
-  -d "{}"
+  -d '{"spec_id": "FAMILY_SATURDAY_V1"}'
 
 # Continue (use next_url from response)
-curl -X POST https://localhost:5001/v2/pub/conversation/{sessionId}/next \
+curl -X POST https://localhost:5001/conversation/{sessionId}/next \
   -H "Content-Type: application/json" \
   -H "X-API-KEY: dev-api-key-change-in-production" \
   -d '{"user_input": "5 people"}'
@@ -318,24 +342,24 @@ curl -X POST https://localhost:5001/v2/pub/conversation/{sessionId}/next \
 
 ```
 DecisionSpark/
-??? Config/
-?   ??? DecisionSpecs/          # JSON spec files
-??? Controllers/
-?   ??? StartController.cs      # POST /start
-?   ??? ConversationController.cs # POST /conversation/{id}/next
-??? Models/
-?   ??? Api/    # Request/Response DTOs
-?   ??? Runtime/        # Session, EvaluationResult
-?   ??? Spec/     # DecisionSpec models
-??? Services/
-?   ??? ISessionStore.cs        # Session persistence
-?   ??? IDecisionSpecLoader.cs  # Load & validate specs
-?   ??? IRoutingEvaluator.cs    # Rule evaluation
-?   ??? ITraitParser.cs         # Input parsing
-?   ??? IQuestionGenerator.cs   # Question phrasing (stub)
-?   ??? IResponseMapper.cs      # API response mapping
-??? Program.cs      # DI, Serilog, startup
-??? appsettings.json           # Configuration
+├── Config/
+│   └── DecisionSpecs/          # JSON spec files
+├── Controllers/
+│   ├── ConversationController.cs # All conversation endpoints
+│   └── HomeController.cs         # Home/views
+├── Models/
+│   ├── Api/                      # Request/Response DTOs
+│   ├── Runtime/                  # Session, EvaluationResult
+│   └── Spec/                     # DecisionSpec models
+├── Services/
+│   ├── ISessionStore.cs          # Session persistence
+│   ├── IDecisionSpecLoader.cs    # Load & validate specs
+│   ├── IRoutingEvaluator.cs      # Rule evaluation
+│   ├── ITraitParser.cs           # Input parsing
+│   ├── IQuestionGenerator.cs     # Question phrasing (stub)
+│   └── IResponseMapper.cs        # API response mapping
+├── Program.cs                    # DI, Serilog, startup
+└── appsettings.json              # Configuration
 
 ```
 

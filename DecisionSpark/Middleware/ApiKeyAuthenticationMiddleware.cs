@@ -14,9 +14,9 @@ public class ApiKeyAuthenticationMiddleware
 
     private static readonly HashSet<string> _exemptPaths = new(StringComparer.OrdinalIgnoreCase)
     {
-        "/demo",
         "/swagger",
         "/health",
+        "/about",
         "/"
     };
 
@@ -32,7 +32,7 @@ public class ApiKeyAuthenticationMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Skip authentication for exempt paths (demo endpoints, swagger, home pages)
+        // Skip authentication for exempt paths (swagger, home pages)
         if (IsExemptPath(context.Request.Path))
         {
             await _next(context);

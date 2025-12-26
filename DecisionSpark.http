@@ -13,11 +13,19 @@
 @contentType = application/json
 
 ###############################################################################
+### Test 0: Get Available Specs
+### Expected: 200 OK with list of available decision specs
+###############################################################################
+
+GET {{baseUrl}}/conversation/specs
+X-API-KEY: {{apiKey}}
+
+###############################################################################
 ### Test 1: Start Session
 ### Expected: 200 OK with first question (group_size)
 ###############################################################################
 
-POST {{baseUrl}}/start
+POST {{baseUrl}}/conversation/start
 Content-Type: {{contentType}}
 X-API-KEY: {{apiKey}}
 
@@ -28,7 +36,7 @@ X-API-KEY: {{apiKey}}
 ### Expected: 200 OK with first question
 ###############################################################################
 
-POST {{baseUrl}}/start
+POST {{baseUrl}}/conversation/start
 Content-Type: {{contentType}}
 X-API-KEY: {{apiKey}}
 
@@ -39,7 +47,7 @@ X-API-KEY: {{apiKey}}
 ### Expected: 401 Unauthorized
 ###############################################################################
 
-POST {{baseUrl}}/start
+POST {{baseUrl}}/conversation/start
 Content-Type: {{contentType}}
 
 {}
@@ -49,7 +57,7 @@ Content-Type: {{contentType}}
 ### Expected: 401 Unauthorized
 ###############################################################################
 
-POST {{baseUrl}}/start
+POST {{baseUrl}}/conversation/start
 Content-Type: {{contentType}}
 X-API-KEY: wrong-key
 
@@ -108,7 +116,7 @@ X-API-KEY: {{apiKey}}
 ### Expected: 200 OK with first question
 ###############################################################################
 
-POST {{baseUrl}}/start
+POST {{baseUrl}}/conversation/start
 Content-Type: {{contentType}}
 X-API-KEY: {{apiKey}}
 
@@ -200,7 +208,7 @@ X-API-KEY: {{apiKey}}
 ### Step 1: Start new session
 ###############################################################################
 
-POST {{baseUrl}}/start
+POST {{baseUrl}}/conversation/start
 Content-Type: {{contentType}}
 X-API-KEY: {{apiKey}}
 

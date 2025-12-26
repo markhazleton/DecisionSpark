@@ -119,9 +119,9 @@ DecisionSpark/
 - Include correlation IDs for tracking
 
 ### Example Endpoints
-- `POST /start` - Initialize a decision session
+- `POST /conversation/start` - Initialize a decision session
+- `GET /conversation/specs` - Get list of available decision specs
 - `POST /conversation/{sessionId}/next` - Submit answer and get next question
-- `GET /demo` - Web UI demo endpoints
 
 ## Testing Approach
 
