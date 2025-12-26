@@ -1,31 +1,187 @@
 # DecisionSpark
 
-A Dynamic Decision Routing Engine that uses conversation-style APIs to guide users through minimal questions and recommend optimal outcomes.
+[![.NET Version](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-## Overview
+> A Dynamic Decision Routing Engine that uses conversation-style APIs to guide users through minimal questions and recommend optimal outcomes.
 
-DecisionSpark is a .NET 9 Web API that implements a flexible, config-driven decision engine. It asks users minimal questions, evaluates responses against configurable rules, and routes to optimal outcomes.
+## 🚀 Overview
+
+DecisionSpark is a .NET 10 web application that implements a flexible, config-driven decision engine. It combines a RESTful API with an interactive Razor Pages web interface to guide users through intelligent conversations, asking minimal questions while evaluating responses against configurable rules to recommend optimal outcomes.
 
 ### Example Use Case: Family Saturday Planner
-- Ask: "How many people?" ? "What ages?"
-- Evaluate: group size, age ranges, derived traits
-- Recommend: Go Bowling / Movie Night / Go Golfing
+- **Ask**: "How many people?" → "What ages?"
+- **Evaluate**: group size, age ranges, derived traits
+- **Recommend**: Go Bowling / Movie Night / Go Golfing
 
-## Architecture
+### Key Features
+
+✅ **Conversation-Driven API** - RESTful endpoints for starting and continuing decision sessions  
+✅ **Multiple Question Types** - Text input, single-select, and multi-select with options  
+✅ **OpenAI Integration** - Natural language question generation and answer parsing  
+✅ **Web UI Interface** - Interactive Razor Pages testing interface  
+✅ **Config-Driven Rules** - JSON-based decision specifications with no code changes  
+✅ **Intelligent Routing** - Rule-based evaluation with derived traits and tie-breaking  
+✅ **Session Management** - File-based conversation persistence  
+✅ **API Documentation** - Swagger/OpenAPI with interactive testing  
+✅ **Structured Logging** - Serilog with console and rolling file outputs  
+
+## 📋 Table of Contents
+
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Getting Started](#getting-started)
+- [API Reference](#api-reference)
+- [Configuration](#configuration)
+- [Web UI](#web-ui)
+- [Decision Specs](#decision-specs)
+- [Development](#development)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Contributing](#contributing)
+- [License](#license)
+
+## 🏗️ Architecture
 
 ### Core Components
 
-1. **DecisionSpec** (JSON config): Defines traits, rules, outcomes, and tie-breaking strategies
-2. **Session Store**: Maintains conversation state (in-memory for POC, Redis-ready)
-3. **Routing Evaluator**: Applies immediate rules, outcome rules, and disambiguation logic
-4. **Trait Parser**: Extracts structured data from free-text user input
-5. **Question Generator**: Phrases questions (stub for now, OpenAI-ready)
-6. **Response Mapper**: Converts internal results to API contract shapes
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    DecisionSpark Engine                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Web UI     │  │  API Layer   │  │    Swagger   │      │
+│  │ (Razor Pages)│  │ (REST API)   │  │   (OpenAPI)  │      │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
+│         │                  │                  │               │
+│         └──────────────────┴──────────────────┘              │
+│                            │                                  │
+│         ┌──────────────────┴───────────────────┐            │
+│         │                                        │            │
+│  ┌──────▼──────┐  ┌──────────────┐  ┌─────────▼────┐      │
+│  │  Session    │  │   Question   │  │   Response   │      │
+│  │   Store     │  │  Generator   │  │    Mapper    │      │
+│  └─────────────┘  └──────┬───────┘  └──────────────┘      │
+│                           │                                  │
+│  ┌─────────────┐  ┌──────▼───────┐  ┌──────────────┐      │
+│  │   Routing   │  │    Trait     │  │   OpenAI     │      │
+│  │  Evaluator  │  │    Parser    │  │   Service    │      │
+│  └─────────────┘  └──────────────┘  └──────────────┘      │
+│                                                               │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │          DecisionSpec Loader (JSON)                 │    │
+│  └────────────────────────────────────────────────────┘    │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
 
-### API Endpoints
+### Key Services
 
-#### `GET /conversation/specs`
-Returns a list of available decision specs.
+| Service | Purpose | Implementation |
+|---------|---------|----------------|
+| **DecisionSpecLoader** | Loads and validates JSON decision configurations | `FileSystemDecisionSpecLoader` |
+| **SessionStore** | Maintains conversation state | `InMemorySessionStore` |
+| **RoutingEvaluator** | Applies rules and determines outcomes | `RoutingEvaluator` |
+| **TraitParser** | Extracts structured data from user input | `TraitParser` |
+| **QuestionGenerator** | Phrases natural language questions | `OpenAIQuestionGenerator` |
+| **ResponseMapper** | Converts internal results to API contracts | `ResponseMapper` |
+| **OpenAIService** | Integration with OpenAI/Azure OpenAI | `OpenAIService` |
+| **ConversationPersistence** | Saves conversation history | `FileConversationPersistence` |
+
+## 📦 Prerequisites
+
+- **.NET 10 SDK** or later ([Download](https://dotnet.microsoft.com/download))
+- **Visual Studio 2022** (v17.12+) or **VS Code** with C# extension
+- **OpenAI API Key** or **Azure OpenAI** credentials (optional, has fallback mode)
+- **Git** for version control
+
+### Development Tools (Recommended)
+
+- **Postman** or **curl** for API testing
+- **Azure CLI** for Azure deployments
+- **Docker** (optional, for containerized deployment)
+
+## 🚀 Getting Started
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/markhazleton/DecisionSpark.git
+cd DecisionSpark
+```
+
+### 2. Configure Application Settings
+
+Edit `appsettings.json` or use User Secrets for sensitive data:
+
+```bash
+cd DecisionSpark
+dotnet user-secrets set "OpenAI:ApiKey" "your-openai-api-key"
+dotnet user-secrets set "DecisionEngine:ApiKey" "your-custom-api-key"
+```
+
+**Minimal Configuration** (`appsettings.json`):
+
+```json
+{
+  "DecisionEngine": {
+    "ConfigPath": "Config/DecisionSpecs",
+    "DefaultSpecId": "TECH_STACK_ADVISOR_V1",
+    "ApiKey": "dev-api-key-change-in-production"
+  },
+  "OpenAI": {
+    "Provider": "OpenAI",
+    "ApiKey": "your-openai-api-key-here",
+    "Model": "gpt-4",
+    "EnableFallback": true
+  }
+}
+```
+
+### 3. Build and Run
+
+```bash
+dotnet restore
+dotnet build
+dotnet run --project DecisionSpark
+```
+
+The application will start at:
+- **HTTPS**: `https://localhost:5001`
+- **HTTP**: `http://localhost:5000`
+
+### 4. Access the Application
+
+- **Web UI**: `https://localhost:5001/`
+- **API Documentation**: `https://localhost:5001/swagger`
+- **About Page**: `https://localhost:5001/about`
+
+## 📚 API Reference
+
+### Base URL
+
+```
+https://localhost:5001
+```
+
+All API endpoints require the `X-API-KEY` header for authentication.
+
+### Authentication
+
+```http
+X-API-KEY: dev-api-key-change-in-production
+```
+
+### Endpoints
+
+#### Get Available Decision Specs
+
+```http
+GET /conversation/specs
+```
 
 **Response:**
 ```json
@@ -33,348 +189,514 @@ Returns a list of available decision specs.
   "specs": [
     {
       "specId": "FAMILY_SATURDAY_V1",
-      "fileName": "FAMILY_SATURDAY_V1.0.0.0.active.json",
+      "fileName": "FAMILY_SATURDAY_V1.1.0.0.active.json",
       "displayName": "FAMILY SATURDAY V1",
+      "isDefault": false
+    },
+    {
+      "specId": "TECH_STACK_ADVISOR_V1",
+      "fileName": "TECH_STACK_ADVISOR_V1.0.0.0.active.json",
+      "displayName": "TECH STACK ADVISOR V1",
       "isDefault": true
     }
   ]
 }
 ```
 
-#### `POST /conversation/start`
-Initializes a decision session and returns the first question or final recommendation.
+#### Start a Decision Conversation
 
-**Request:**
-```json
-{
-  "spec_id": "FAMILY_SATURDAY_V1"
-}
-```
-*Note: spec_id is optional; defaults to configured DefaultSpecId*
+```http
+POST /conversation/start
+Content-Type: application/json
+X-API-KEY: your-api-key
 
-**Response (text question):**
-```json
 {
-  "texts": ["Let's figure out the best plan for Saturday."],
-  "question": {
-    "id": "group_size",
-    "source": "FAMILY_SATURDAY_V1",
-    "text": "How many people are going on the outing?",
-    "type": "text",
-    "allowFreeText": true,
-    "isFreeText": true,
-    "allowMultiSelect": false,
-    "isMultiSelect": false,
-    "options": [],
-    "metadata": {
-      "llmReasoning": "Free-text question for trait 'group_size' of type 'integer'",
-      "confidence": 0.9,
-      "allowFreeText": true,
-      "validationHints": []
-    }
-  },
-  "next_url": "https://api.example.com/conversation/abc123/next"
+  "spec_id": "TECH_STACK_ADVISOR_V1"
 }
 ```
 
-**Response (single-select question with options):**
+**Response (Question):**
 ```json
 {
-  "texts": ["Thanks! One quick question."],
+  "texts": ["Let's find the best technology stack for your project."],
   "question": {
-    "id": "activity_preference",
-    "source": "FAMILY_SATURDAY_V1",
-    "text": "What type of activity would you prefer?",
+    "id": "project_type",
+    "source": "TECH_STACK_ADVISOR_V1",
+    "text": "What type of project are you building?",
     "type": "single-select",
     "allowFreeText": true,
     "isFreeText": false,
-    "allowMultiSelect": false,
-    "isMultiSelect": false,
     "options": [
       {
-        "id": "indoor-sports",
-        "label": "Indoor sports",
-        "value": "indoor-sports",
-        "isNegative": false,
-        "isDefault": false,
-        "confidence": 0.9
+        "id": "web-app",
+        "label": "Web Application",
+        "value": "web-app",
+        "isNegative": false
       },
       {
-        "id": "outdoor-activities",
-        "label": "Outdoor activities",
-        "value": "outdoor-activities",
-        "isNegative": false,
-        "isDefault": false,
-        "confidence": 0.9
-      },
-      {
-        "id": "none-of-the-above",
-        "label": "None of the above",
-        "value": "none",
-        "isNegative": true,
-        "isDefault": false,
-        "confidence": 0.85
+        "id": "mobile-app",
+        "label": "Mobile Application",
+        "value": "mobile-app",
+        "isNegative": false
       }
-    ],
-    "metadata": {
-      "llmReasoning": "Single selection required per trait configuration",
-      "confidence": 0.9,
-      "allowFreeText": true,
-      "validationHints": []
-    }
+    ]
   },
-  "next_url": "https://api.example.com/conversation/abc123/next"
+  "next_url": "https://localhost:5001/conversation/abc123/next"
 }
 ```
 
-**Response (immediate outcome):**
+**Response (Final Recommendation):**
 ```json
 {
   "is_complete": true,
-  "texts": ["Here's what I recommend:"],
+  "texts": ["Based on your requirements, here's my recommendation:"],
   "display_cards": [...],
-  "care_type_message": "Bowling is perfect for your crew",
+  "care_type_message": "React with .NET Core API",
   "final_result": {
-    "outcome_id": "GO_BOWLING",
-    "resolution_button_label": "Reserve a lane",
-    "resolution_button_url": "https://example.local/bowling",
-    "analytics_resolution_code": "ROUTE_BOWLING"
-  },
-  "raw_response": "ROUTE_BOWLING"
-}
-```
-
-#### `POST /conversation/{sessionId}/next`
-Continues the conversation with user's answer.
-
-**Request (free text):**
-```json
-{
-  "user_input": "5 people: ages 4, 9, 38, 40, 12"
-}
-```
-
-**Request (structured selection):**
-```json
-{
-  "selected_option_ids": ["indoor-sports"],
-  "user_input": "My custom answer"
-}
-```
-
-**Request (multi-select with negative option override):**
-```json
-{
-  "selected_option_ids": ["option-fever", "option-cough", "none-of-the-above"]
-}
-```
-Note: When `none-of-the-above` (negative option) is detected, only that option is stored per FR-006.
-
-**Response (next question or completion):**
-Same shape as Start response, plus optional `prev_url` and `error` for validation failures.
-
-### Configuration
-
-**appsettings.json:**
-```json
-{
-  "DecisionEngine": {
-    "ConfigPath": "Config/DecisionSpecs",
-    "DefaultSpecId": "FAMILY_SATURDAY_V1",
-    "ApiKey": "your-api-key"
+    "outcome_id": "REACT_DOTNET",
+    "resolution_button_label": "Get Started",
+    "resolution_button_url": "https://example.com/react-dotnet",
+    "analytics_resolution_code": "ROUTE_REACT_DOTNET"
   }
 }
 ```
 
-### DecisionSpec Schema
+#### Continue Conversation
 
-Key sections:
-- `traits`: Questions to ask (key, question_text, answer_type, bounds, dependencies)
-- `derived_traits`: Computed values (min_age, max_age, adult_count)
-- `immediate_select_if`: Short-circuit rules (e.g., min_age < 5 ? Movie Night)
-- `outcomes`: Possible recommendations with selection_rules
-- `tie_strategy`: LLM clarifier for ambiguous cases
-- `disambiguation`: Fallback trait order
+```http
+POST /conversation/{sessionId}/next
+Content-Type: application/json
+X-API-KEY: your-api-key
 
-### Flow
+{
+  "user_input": "web application"
+}
+```
 
-1. **Client calls `/conversation/start`**
-   - Server creates session
-   - Loads active DecisionSpec
-   - Evaluates immediate rules
-   - Returns first question or outcome
+Or with structured selection:
 
-2. **Client POSTs answer to `next_url`** (e.g., `/conversation/{sessionId}/next`)
-   - Server parses input ? trait value
- - Validates (retry with rephrased question if invalid)
-   - Re-evaluates rules
-   - Returns next question or final outcome
+```json
+{
+  "selected_option_ids": ["web-app"],
+  "user_input": "I want to build a web app"
+}
+```
 
-3. **Repeats until `is_complete: true`**
+**Response:** Same structure as Start endpoint
 
-### Error Handling
+### Error Responses
 
-**Invalid input:**
+**Invalid Input (400):**
 ```json
 {
   "error": {
     "code": "INVALID_INPUT",
-    "message": "Could not find valid ages. Please list as numbers (0-120)."
+    "message": "Could not parse response. Please provide a valid selection."
   },
   "question": { ...rephrased question... },
   "next_url": "..."
 }
 ```
 
-**Missing session:** 404  
-**Invalid API key:** 401  
-**Input too large (>2KB):** 413
-
-### Derived Traits
-
-Automatically computed from collected traits:
-- `min_age`: `min(all_ages)`
-- `max_age`: `max(all_ages)`
-- `adult_count`: `count(all_ages >= 18)`
-
-### Rules Engine
-
-Simple expression evaluator supporting:
-- Operators: `<`, `>`, `<=`, `>=`, `==`
-- Examples:
-  - `min_age < 5`
-  - `group_size >= 4`
-  - `adult_count == 2`
-
-### Tie Resolution
-
-When multiple outcomes satisfy rules:
-1. Trigger LLM clarifier (asks preference question)
-2. Map answer to pseudo-trait (e.g., `preference_activity_style`)
-3. Re-evaluate with pseudo-trait
-4. If still ambiguous after max attempts (2): fallback to first outcome
-
-### Logging
-
-Uses Serilog with:
-- Console sink (development)
-- Rolling file sink: `logs/decisionspark-{Date}.txt`
-- Structured logging: session_id, trait_key, outcome_id, etc.
-
-### Security
-
-- API Key required in `X-API-KEY` header
-- Configure in appsettings.json (use secrets in production)
-- Input size limits (2KB)
-
-## Getting Started
-
-### Prerequisites
-- .NET 9 SDK
-- Visual Studio 2022 or VS Code
-
-### Run Locally
-
-```bash
-cd DecisionSpark
-dotnet run
+**Session Not Found (404):**
+```json
+{
+  "error": "Session not found"
+}
 ```
 
-API will be available at `https://localhost:5001` (or configured port).
-
-### Test with curl
-
-```bash
-# Get available specs
-curl -X GET https://localhost:5001/conversation/specs \
-  -H "X-API-KEY: dev-api-key-change-in-production"
-
-# Start session
-curl -X POST https://localhost:5001/conversation/start \
-  -H "Content-Type: application/json" \
-  -H "X-API-KEY: dev-api-key-change-in-production" \
-  -d '{"spec_id": "FAMILY_SATURDAY_V1"}'
-
-# Continue (use next_url from response)
-curl -X POST https://localhost:5001/conversation/{sessionId}/next \
-  -H "Content-Type: application/json" \
-  -H "X-API-KEY: dev-api-key-change-in-production" \
-  -d '{"user_input": "5 people"}'
+**Unauthorized (401):**
+```json
+{
+  "error": "Invalid or missing API key"
+}
 ```
 
-## Extensibility
+## ⚙️ Configuration
 
-### Add New Spec
+### Application Settings
 
-1. Create JSON file: `Config/DecisionSpecs/YOUR_SPEC_V1.1.0.0.active.json`
-2. Define traits, rules, outcomes
-3. Update `DefaultSpecId` in appsettings.json
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `DecisionEngine:ConfigPath` | Path to decision spec JSON files | `Config/DecisionSpecs` |
+| `DecisionEngine:DefaultSpecId` | Default spec to use | `TECH_STACK_ADVISOR_V1` |
+| `DecisionEngine:ApiKey` | API authentication key | `dev-api-key-change-in-production` |
+| `OpenAI:Provider` | Provider type (`OpenAI` or `Azure`) | `OpenAI` |
+| `OpenAI:ApiKey` | OpenAI API key | - |
+| `OpenAI:Model` | Model to use | `gpt-4` |
+| `OpenAI:EnableFallback` | Use fallback if OpenAI unavailable | `true` |
+| `ConversationStorage:Path` | Path for conversation persistence | `conversations` |
+| `Serilog:LogDirectory` | Log file directory | `logs` |
 
-### Swap OpenAI Integration
+### OpenAI Configuration
 
-1. Implement `IQuestionGenerator` with Azure.AI.OpenAI
-2. Register in Program.cs DI
-3. Configure API key in appsettings or Azure Key Vault
+**OpenAI (Direct):**
+```json
+{
+  "OpenAI": {
+    "Provider": "OpenAI",
+    "ApiKey": "sk-...",
+    "Model": "gpt-4",
+    "MaxTokens": 500,
+    "Temperature": 0.7,
+    "EnableFallback": true
+  }
+}
+```
 
-### Use Redis Session Store
+**Azure OpenAI:**
+```json
+{
+  "OpenAI": {
+    "Provider": "Azure",
+    "Endpoint": "https://your-resource.openai.azure.com",
+    "ApiKey": "your-azure-key",
+    "DeploymentName": "gpt-4",
+    "EnableFallback": true
+  }
+}
+```
 
-1. Implement `ISessionStore` with StackExchange.Redis
-2. Register in Program.cs DI
-3. Add connection string to configuration
+## 🖥️ Web UI
 
-## Future Enhancements
+DecisionSpark includes a full-featured Razor Pages web interface for testing and demonstrating the decision engine.
 
-- [X] Multi-select option support with negative option handling
-- [X] Structured option selection with deterministic IDs
-- [X] Question type arbitration (text/single-select/multi-select)
-- [X] Validation history and retry logic with third-attempt fallback
-- [X] Telemetry tracking for renderer selection and latency
-- [ ] OpenAI question phrasing enhancement
-- [ ] LLM answer validation for complex traits
-- [ ] LLM clarifier for tie resolution (framework exists)
-- [ ] Session expiration and cleanup
-- [ ] Redis session persistence
-- [ ] Analytics event publishing
-- [ ] `/prev` endpoint for navigation back
-- [ ] Admin API for spec management
+### Features
 
-## Project Structure
+- 📝 **Interactive Conversation Interface** - Real-time question/answer flow
+- 🎯 **Multiple Question Types** - Text inputs, single-select, and multi-select
+- 📊 **Spec Selection** - Choose from available decision specifications
+- 🔍 **Debug Console** - View session state and evaluation details
+- 📜 **Conversation History** - Track all questions and answers
+- 💾 **Session Persistence** - Save and resume conversations
+
+### Access
+
+Navigate to `https://localhost:5001/` to access the interactive testing interface.
+
+## 📝 Decision Specs
+
+Decision specifications are JSON configuration files that define the conversation flow and decision logic.
+
+### File Naming Convention
+
+```
+{SPEC_ID}.{MAJOR}.{MINOR}.{PATCH}.{BUILD}.active.json
+```
+
+Example: `TECH_STACK_ADVISOR_V1.0.0.0.active.json`
+
+### Spec Structure
+
+```json
+{
+  "spec_id": "TECH_STACK_ADVISOR_V1",
+  "version": "1.0.0.0",
+  "metadata": {
+    "display_name": "Technology Stack Advisor",
+    "description": "Recommends optimal technology stacks"
+  },
+  "traits": [
+    {
+      "key": "project_type",
+      "question_text": "What type of project?",
+      "answer_type": "list",
+      "validation": {
+        "allowed_values": ["web", "mobile", "desktop"]
+      }
+    }
+  ],
+  "derived_traits": [
+    {
+      "key": "complexity_score",
+      "expression": "team_size * 2 + feature_count"
+    }
+  ],
+  "immediate_select_if": [
+    {
+      "condition": "project_type == legacy",
+      "outcome_id": "MAINTAIN_CURRENT"
+    }
+  ],
+  "outcomes": [
+    {
+      "outcome_id": "REACT_DOTNET",
+      "display_name": "React with .NET Core",
+      "selection_rules": [
+        "project_type == web",
+        "team_size >= 3"
+      ]
+    }
+  ]
+}
+```
+
+### Available Specs
+
+1. **FAMILY_SATURDAY_V1** - Family activity planner
+2. **TECH_STACK_ADVISOR_V1** - Technology stack recommendations
+
+### Creating Custom Specs
+
+1. Create a new JSON file in `Config/DecisionSpecs/`
+2. Follow the naming convention
+3. Define traits, rules, and outcomes
+4. Update `DefaultSpecId` in `appsettings.json`
+
+## 🛠️ Development
+
+### Project Structure
 
 ```
 DecisionSpark/
 ├── Config/
-│   └── DecisionSpecs/          # JSON spec files
+│   └── DecisionSpecs/              # JSON decision specifications
 ├── Controllers/
-│   ├── ConversationController.cs # All conversation endpoints
-│   └── HomeController.cs         # Home/views
+│   ├── ConversationController.cs   # API endpoints
+│   └── HomeController.cs           # Web UI controllers
 ├── Models/
-│   ├── Api/                      # Request/Response DTOs
-│   ├── Runtime/                  # Session, EvaluationResult
-│   └── Spec/                     # DecisionSpec models
-├── Services/
-│   ├── ISessionStore.cs          # Session persistence
-│   ├── IDecisionSpecLoader.cs    # Load & validate specs
-│   ├── IRoutingEvaluator.cs      # Rule evaluation
-│   ├── ITraitParser.cs           # Input parsing
-│   ├── IQuestionGenerator.cs     # Question phrasing (stub)
-│   └── IResponseMapper.cs        # API response mapping
-├── Program.cs                    # DI, Serilog, startup
-└── appsettings.json              # Configuration
+│   ├── Api/                        # Request/Response DTOs
+│   │   ├── RequestModels.cs
+│   │   └── ResponseModels.cs
+│   ├── Runtime/                    # Session and evaluation models
+│   │   ├── DecisionSession.cs
+│   │   └── EvaluationResult.cs
+│   └── Spec/                       # DecisionSpec models
+│       └── DecisionSpec.cs
+├── Services/                       # Core business logic
+│   ├── ISessionStore.cs
+│   ├── IDecisionSpecLoader.cs
+│   ├── IRoutingEvaluator.cs
+│   ├── ITraitParser.cs
+│   ├── IQuestionGenerator.cs
+│   ├── IResponseMapper.cs
+│   ├── IOpenAIService.cs
+│   ├── OpenAIService.cs
+│   ├── OpenAIQuestionGenerator.cs
+│   └── IConversationPersistence.cs
+├── Middleware/
+│   └── ApiKeyAuthenticationMiddleware.cs
+├── Views/                          # Razor Pages views
+│   ├── Home/
+│   │   ├── Index.cshtml
+│   │   └── About.cshtml
+│   └── Shared/
+│       └── Components/
+│           └── Questions/
+├── Common/
+│   └── Constants.cs
+├── Program.cs                      # Application startup
+└── appsettings.json                # Configuration
 
+tests/
+└── DecisionSpark.Tests/            # Unit and integration tests
+    ├── Services/
+    ├── Controllers/
+    └── DecisionSpark.Tests.csproj
 ```
 
-## License
+### Dependencies
 
-MIT
+| Package | Version | Purpose |
+|---------|---------|---------|
+| Azure.AI.OpenAI | 2.1.0 | OpenAI and Azure OpenAI integration |
+| Serilog.AspNetCore | 10.0.0 | Structured logging |
+| Swashbuckle.AspNetCore | 9.0.6 | Swagger/OpenAPI documentation |
 
-## Contributing
+### Building
 
-PRs welcome! Focus areas:
-- OpenAI integration
-- Enhanced rule expressions
-- Additional trait parsers
-- Test coverage
+```bash
+# Restore dependencies
+dotnet restore
+
+# Build solution
+dotnet build
+
+# Build specific project
+dotnet build DecisionSpark/DecisionSpark.csproj
+```
+
+### Running Locally
+
+```bash
+# Run with default settings
+dotnet run --project DecisionSpark
+
+# Run with specific environment
+dotnet run --project DecisionSpark --environment Development
+
+# Watch mode (auto-reload on changes)
+dotnet watch run --project DecisionSpark
+```
+
+## 🧪 Testing
+
+### Test Framework
+
+- **xUnit** - Test runner
+- **Moq** - Mocking framework
+- **FluentAssertions** - Assertion library
+
+### Running Tests
+
+```bash
+# Run all tests
+dotnet test
+
+# Run with coverage
+dotnet test /p:CollectCoverage=true
+
+# Run specific test project
+dotnet test tests/DecisionSpark.Tests/DecisionSpark.Tests.csproj
+
+# Run tests with detailed output
+dotnet test --logger "console;verbosity=detailed"
+```
+
+### Test API with curl
+
+```bash
+# Get available specs
+curl -X GET https://localhost:5001/conversation/specs \
+  -H "X-API-KEY: dev-api-key-change-in-production" \
+  -k
+
+# Start conversation
+curl -X POST https://localhost:5001/conversation/start \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: dev-api-key-change-in-production" \
+  -d '{"spec_id": "TECH_STACK_ADVISOR_V1"}' \
+  -k
+
+# Continue conversation
+curl -X POST https://localhost:5001/conversation/{sessionId}/next \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: dev-api-key-change-in-production" \
+  -d '{"user_input": "web application"}' \
+  -k
+```
+
+## 🚀 Deployment
+
+### Local Deployment
+
+```bash
+dotnet publish -c Release -o ./publish
+cd publish
+dotnet DecisionSpark.dll
+```
+
+### Azure App Service
+
+```bash
+# Login to Azure
+az login
+
+# Create App Service
+az webapp create --name decisionspark \
+  --resource-group myResourceGroup \
+  --plan myAppServicePlan \
+  --runtime "DOTNET|10.0"
+
+# Deploy
+az webapp deployment source config-zip \
+  --resource-group myResourceGroup \
+  --name decisionspark \
+  --src ./publish.zip
+```
+
+### Docker
+
+```dockerfile
+# Example Dockerfile
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+WORKDIR /app
+EXPOSE 80
+EXPOSE 443
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY ["DecisionSpark/DecisionSpark.csproj", "DecisionSpark/"]
+RUN dotnet restore "DecisionSpark/DecisionSpark.csproj"
+COPY . .
+WORKDIR "/src/DecisionSpark"
+RUN dotnet build "DecisionSpark.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "DecisionSpark.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "DecisionSpark.dll"]
+```
+
+### Production Configuration
+
+**Use Azure Key Vault or User Secrets for sensitive data:**
+
+```bash
+# Set up User Secrets
+dotnet user-secrets init --project DecisionSpark
+dotnet user-secrets set "OpenAI:ApiKey" "your-prod-key" --project DecisionSpark
+dotnet user-secrets set "DecisionEngine:ApiKey" "your-prod-api-key" --project DecisionSpark
+```
+
+**Environment Variables:**
+
+```bash
+export DecisionEngine__ApiKey="your-secure-api-key"
+export OpenAI__ApiKey="your-openai-key"
+export ASPNETCORE_ENVIRONMENT="Production"
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these guidelines:
+
+1. **Fork the repository**
+2. **Create a feature branch** (`git checkout -b feature/AmazingFeature`)
+3. **Commit your changes** (`git commit -m 'Add some AmazingFeature'`)
+4. **Push to the branch** (`git push origin feature/AmazingFeature`)
+5. **Open a Pull Request**
+
+### Development Focus Areas
+
+- 🔧 Enhanced rule expression engine
+- 🌐 Additional trait parsers
+- 🧪 Expanded test coverage
+- 📊 Analytics and telemetry
+- 🔄 Redis session persistence
+- 🎯 LLM-powered tie resolution
+- ⏮️ `/prev` endpoint for backwards navigation
+- 👥 Admin API for spec management
+
+### Code Style
+
+- Follow standard C# naming conventions
+- Use XML documentation comments for public APIs
+- Maintain existing code structure and patterns
+- Write unit tests for new features
+- Update documentation for API changes
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with **.NET 10** and **ASP.NET Core**
+- Powered by **Azure AI OpenAI** SDK
+- Structured logging with **Serilog**
+- API documentation via **Swagger/OpenAPI**
+- Testing with **xUnit**, **Moq**, and **FluentAssertions**
+
+## 📧 Contact
+
+**Mark Hazleton** - [GitHub](https://github.com/markhazleton)
+
+**Project Link**: [https://github.com/markhazleton/DecisionSpark](https://github.com/markhazleton/DecisionSpark)
 
 ---
 
-**DecisionSpark** - Smart decisions through minimal questions.
+**DecisionSpark** - Smart decisions through minimal questions. 🎯
