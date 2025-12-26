@@ -1,0 +1,679 @@
+{
+  "spec_id": "TECH_STACK_ADVISOR_V1",
+  "version": "1.0.0",
+  "canonical_base_url": "https://api.decisionspark.com",
+  "safety_preamble": "Keep technical advice objective, neutral, and helpful. Focus on practical trade-offs.",
+  "traits": [
+    {
+      "key": "project_name",
+      "question_text": "What's the name of your project?",
+      "answer_type": "string",
+      "parse_hint": "Extract the project name as a string. If they say 'it's called X' or 'project X', extract X.",
+      "required": true,
+      "is_pseudo_trait": false,
+      "depends_on": [],
+      "comment": "FREE TEXT INPUT - Demonstrates text input with natural language parsing"
+    },
+    {
+      "key": "project_description",
+      "question_text": "Briefly describe what your application will do (1-2 sentences).",
+      "answer_type": "string",
+      "parse_hint": "Extract the description. Keep it concise. If they ramble, summarize the key points.",
+      "required": true,
+      "is_pseudo_trait": false,
+      "depends_on": ["project_name"],
+      "comment": "FREE TEXT INPUT - LLM will summarize if needed"
+    },
+    {
+      "key": "team_size",
+      "question_text": "How many developers will be working on this project?",
+      "answer_type": "integer",
+      "parse_hint": "Extract a single integer 1-50. If they say 'just me', return 1. If they say 'small team', return 3.",
+      "required": true,
+      "is_pseudo_trait": false,
+      "depends_on": [],
+      "bounds": {
+        "min": 1,
+        "max": 50
+      },
+      "comment": "INTEGER INPUT - Parser extracts number from text"
+    },
+    {
+      "key": "deployment_target",
+      "question_text": "Where do you plan to deploy this application?",
+      "answer_type": "enum",
+      "parse_hint": "Map answer to: CLOUD, ON_PREMISE, HYBRID, or UNDECIDED",
+      "required": true,
+      "is_pseudo_trait": false,
+      "depends_on": [],
+      "options": [
+        {
+          "id": "cloud",
+          "label": "Cloud (AWS, Azure, GCP)",
+          "value": "CLOUD",
+          "tooltip": "Fully managed cloud infrastructure",
+          "confidence": 0.92
+        },
+        {
+          "id": "on-premise",
+          "label": "On-Premise (Own servers)",
+          "value": "ON_PREMISE",
+          "tooltip": "Your own data center or hardware",
+          "confidence": 0.88
+        },
+        {
+          "id": "hybrid",
+          "label": "Hybrid (Mix of both)",
+          "value": "HYBRID",
+          "tooltip": "Some cloud, some on-premise",
+          "confidence": 0.85
+        },
+        {
+          "id": "undecided",
+          "label": "Not sure yet",
+          "value": "UNDECIDED",
+          "tooltip": "Still evaluating options",
+          "confidence": 0.75,
+          "is_negative": true
+        }
+      ],
+      "comment": "SINGLE-SELECT - Radio buttons with tooltips and confidence scores. Demonstrates negative option."
+    },
+    {
+      "key": "required_features",
+      "question_text": "Which features does your application need? (Select all that apply)",
+      "answer_type": "enum_list",
+      "parse_hint": "Map to list from: AUTHENTICATION, DATABASE, API, REAL_TIME, FILE_STORAGE, CACHING, SEARCH, ANALYTICS, NONE",
+      "required": true,
+      "is_pseudo_trait": false,
+      "depends_on": ["deployment_target"],
+      "allow_multiple": true,
+      "max_selections": 7,
+      "options": [
+        {
+          "id": "authentication",
+          "label": "User Authentication & Authorization",
+          "value": "AUTHENTICATION",
+          "tooltip": "Login, signup, roles, permissions",
+          "confidence": 0.95
+        },
+        {
+          "id": "database",
+          "label": "Database (SQL or NoSQL)",
+          "value": "DATABASE",
+          "tooltip": "Persistent data storage",
+          "confidence": 0.93
+        },
+        {
+          "id": "api",
+          "label": "REST or GraphQL API",
+          "value": "API",
+          "tooltip": "Expose endpoints for clients",
+          "confidence": 0.91
+        },
+        {
+          "id": "real-time",
+          "label": "Real-time Communication (WebSockets, SignalR)",
+          "value": "REAL_TIME",
+          "tooltip": "Live updates, chat, notifications",
+          "confidence": 0.87
+        },
+        {
+          "id": "file-storage",
+          "label": "File Upload/Storage",
+          "value": "FILE_STORAGE",
+          "tooltip": "Handle images, documents, media",
+          "confidence": 0.89
+        },
+        {
+          "id": "caching",
+          "label": "Caching Layer (Redis, Memcached)",
+          "value": "CACHING",
+          "tooltip": "Improve performance with caching",
+          "confidence": 0.84
+        },
+        {
+          "id": "none-needed",
+          "label": "None of these / Very simple app",
+          "value": "NONE",
+          "tooltip": "Basic static or minimal functionality",
+          "confidence": 0.78,
+          "is_negative": true
+        }
+      ],
+      "comment": "MULTI-SELECT - Checkboxes with max 7 selections. Demonstrates negative option that clears others when selected."
+    },
+    {
+      "key": "performance_priority",
+      "question_text": "How important is performance/scalability for this project?",
+      "answer_type": "enum",
+      "parse_hint": "Map to: CRITICAL, IMPORTANT, MODERATE, NOT_PRIORITY",
+      "required": true,
+      "is_pseudo_trait": false,
+      "depends_on": ["required_features"],
+      "options": [
+        {
+          "id": "critical",
+          "label": "Critical - Must handle high load",
+          "value": "CRITICAL",
+          "tooltip": "Millions of users, real-time requirements",
+          "confidence": 0.94
+        },
+        {
+          "id": "important",
+          "label": "Important - Should scale well",
+          "value": "IMPORTANT",
+          "tooltip": "Thousands of users, steady growth",
+          "confidence": 0.90
+        },
+        {
+          "id": "moderate",
+          "label": "Moderate - Normal performance is fine",
+          "value": "MODERATE",
+          "tooltip": "Hundreds of users, occasional spikes",
+          "confidence": 0.86
+        },
+        {
+          "id": "not-priority",
+          "label": "Not a priority - Internal tool or prototype",
+          "value": "NOT_PRIORITY",
+          "tooltip": "Small user base, development speed matters more",
+          "confidence": 0.82
+        }
+      ],
+      "comment": "SINGLE-SELECT - All options with different confidence scores"
+    },
+    {
+      "key": "preferred_languages",
+      "question_text": "Which programming languages is your team comfortable with? (Select all that apply)",
+      "answer_type": "enum_list",
+      "parse_hint": "Map to list from: CSHARP, JAVASCRIPT, TYPESCRIPT, PYTHON, JAVA, GO, RUST, PHP, RUBY, NONE",
+      "required": true,
+      "is_pseudo_trait": false,
+      "depends_on": ["team_size"],
+      "allow_multiple": true,
+      "max_selections": 5,
+      "options": [
+        {
+          "id": "csharp",
+          "label": "C# / .NET",
+          "value": "CSHARP",
+          "tooltip": "Enterprise-ready, strong typing, great tooling",
+          "confidence": 0.92
+        },
+        {
+          "id": "javascript",
+          "label": "JavaScript",
+          "value": "JAVASCRIPT",
+          "tooltip": "Universal language, huge ecosystem",
+          "confidence": 0.95
+        },
+        {
+          "id": "typescript",
+          "label": "TypeScript",
+          "value": "TYPESCRIPT",
+          "tooltip": "JavaScript with type safety",
+          "confidence": 0.93
+        },
+        {
+          "id": "python",
+          "label": "Python",
+          "value": "PYTHON",
+          "tooltip": "Simple syntax, great for data/ML",
+          "confidence": 0.91
+        },
+        {
+          "id": "java",
+          "label": "Java",
+          "value": "JAVA",
+          "tooltip": "Mature ecosystem, enterprise standard",
+          "confidence": 0.89
+        },
+        {
+          "id": "go",
+          "label": "Go",
+          "value": "GO",
+          "tooltip": "Fast, simple, great for microservices",
+          "confidence": 0.87
+        },
+        {
+          "id": "none",
+          "label": "None of these / Open to learning",
+          "value": "NONE",
+          "tooltip": "We'll learn whatever works best",
+          "confidence": 0.75,
+          "is_negative": true
+        }
+      ],
+      "comment": "MULTI-SELECT with negative option - 'None' clears all other language selections"
+    },
+    {
+      "key": "timeline_constraint",
+      "question_text": "What's your timeline to launch an MVP?",
+      "answer_type": "enum",
+      "parse_hint": "Map to: WEEKS, MONTHS, QUARTER, YEAR, FLEXIBLE",
+      "required": true,
+      "is_pseudo_trait": false,
+      "depends_on": ["team_size"],
+      "options": [
+        {
+          "id": "weeks",
+          "label": "2-4 weeks",
+          "value": "WEEKS",
+          "tooltip": "Very tight deadline",
+          "confidence": 0.88
+        },
+        {
+          "id": "months",
+          "label": "2-3 months",
+          "value": "MONTHS",
+          "tooltip": "Standard startup timeline",
+          "confidence": 0.92
+        },
+        {
+          "id": "quarter",
+          "label": "This quarter (3-4 months)",
+          "value": "QUARTER",
+          "tooltip": "Business planning cycle",
+          "confidence": 0.90
+        },
+        {
+          "id": "year",
+          "label": "This year (6-12 months)",
+          "value": "YEAR",
+          "tooltip": "Long-term project",
+          "confidence": 0.85
+        },
+        {
+          "id": "flexible",
+          "label": "No specific deadline",
+          "value": "FLEXIBLE",
+          "tooltip": "We'll take the time needed",
+          "confidence": 0.80
+        }
+      ],
+      "comment": "SINGLE-SELECT - Timeline options with varying confidence"
+    },
+    {
+      "key": "compliance_requirements",
+      "question_text": "Does your application need to comply with specific regulations? (Select all that apply)",
+      "answer_type": "enum_list",
+      "parse_hint": "Map to list from: HIPAA, GDPR, SOC2, PCI_DSS, FERPA, NONE",
+      "required": false,
+      "is_pseudo_trait": false,
+      "depends_on": ["deployment_target"],
+      "allow_multiple": true,
+      "max_selections": 4,
+      "options": [
+        {
+          "id": "hipaa",
+          "label": "HIPAA (Healthcare data)",
+          "value": "HIPAA",
+          "tooltip": "Protected health information",
+          "confidence": 0.96
+        },
+        {
+          "id": "gdpr",
+          "label": "GDPR (EU privacy)",
+          "value": "GDPR",
+          "tooltip": "European data protection",
+          "confidence": 0.94
+        },
+        {
+          "id": "soc2",
+          "label": "SOC 2 (Security audit)",
+          "value": "SOC2",
+          "tooltip": "Enterprise security standards",
+          "confidence": 0.92
+        },
+        {
+          "id": "pci-dss",
+          "label": "PCI DSS (Payment card data)",
+          "value": "PCI_DSS",
+          "tooltip": "Credit card processing",
+          "confidence": 0.95
+        },
+        {
+          "id": "no-compliance",
+          "label": "None / Not applicable",
+          "value": "NONE",
+          "tooltip": "No special compliance needed",
+          "confidence": 0.85,
+          "is_negative": true
+        }
+      ],
+      "comment": "MULTI-SELECT with negative option - 'None' is exclusive and clears other compliance selections"
+    }
+  ],
+  "derived_traits": [
+    {
+      "key": "is_solo_developer",
+      "expression": "team_size == 1"
+    },
+    {
+      "key": "is_small_team",
+      "expression": "team_size >= 2 and team_size <= 5"
+    },
+    {
+      "key": "is_large_team",
+      "expression": "team_size > 10"
+    },
+    {
+      "key": "needs_high_performance",
+      "expression": "performance_priority in ['CRITICAL', 'IMPORTANT']"
+    },
+    {
+      "key": "needs_compliance",
+      "expression": "len(compliance_requirements) > 0 and 'NONE' not in compliance_requirements"
+    },
+    {
+      "key": "feature_count",
+      "expression": "len(required_features)"
+    },
+    {
+      "key": "is_cloud_ready",
+      "expression": "deployment_target in ['CLOUD', 'HYBRID']"
+    }
+  ],
+  "immediate_select_if": [
+    {
+      "outcome_id": "SIMPLE_STATIC_SITE",
+      "rule": "required_features == ['NONE'] or (feature_count == 0 and deployment_target == 'UNDECIDED')"
+    }
+  ],
+  "outcomes": [
+    {
+      "outcome_id": "DOTNET_STACK",
+      "selection_rules": [
+        "CSHARP in preferred_languages",
+        "needs_high_performance == true",
+        "is_cloud_ready == true"
+      ],
+      "display_cards": [
+        {
+          "title": ".NET Stack with C# 🚀",
+          "subtitle": "Enterprise-ready, high-performance",
+          "group_id": "tech_recommendation",
+          "care_type_message": "Based on your requirements, .NET is an excellent choice.",
+          "icon_url": "https://api.decisionspark.com/icons/dotnet.png",
+          "body_text": [
+            "✅ ASP.NET Core for high-performance APIs",
+            "✅ Entity Framework Core for database",
+            "✅ Azure cloud integration",
+            "✅ Strong typing and excellent tooling"
+          ],
+          "care_type_details": [
+            "Frontend: Blazor or React/Vue with TypeScript",
+            "Database: SQL Server or PostgreSQL with EF Core",
+            "Caching: Redis or Azure Cache",
+            "Authentication: ASP.NET Core Identity + Azure AD",
+            "Deployment: Azure App Service or Kubernetes"
+          ],
+          "rules": [
+            "Perfect for teams familiar with C# and Visual Studio",
+            "Great Azure integration if using Microsoft cloud",
+            "Strong enterprise support and long-term stability"
+          ]
+        }
+      ],
+      "care_type_message": ".NET provides the performance and enterprise features you need.",
+      "final_result": {
+        "resolution_button_label": "See .NET template",
+        "resolution_button_url": "https://api.decisionspark.com/templates/dotnet",
+        "analytics_resolution_code": "ROUTE_DOTNET"
+      }
+    },
+    {
+      "outcome_id": "NODEJS_TYPESCRIPT_STACK",
+      "selection_rules": [
+        "TYPESCRIPT in preferred_languages or JAVASCRIPT in preferred_languages",
+        "is_cloud_ready == true",
+        "feature_count >= 3"
+      ],
+      "display_cards": [
+        {
+          "title": "Node.js + TypeScript Stack 🟢",
+          "subtitle": "Modern, flexible, huge ecosystem",
+          "group_id": "tech_recommendation",
+          "care_type_message": "Node.js with TypeScript gives you speed and type safety.",
+          "icon_url": "https://api.decisionspark.com/icons/nodejs.png",
+          "body_text": [
+            "✅ Express or Fastify for APIs",
+            "✅ TypeScript for type safety",
+            "✅ Massive npm ecosystem",
+            "✅ Great for real-time features"
+          ],
+          "care_type_details": [
+            "Frontend: Next.js, React, or Vue",
+            "Database: PostgreSQL with Prisma or TypeORM",
+            "Caching: Redis",
+            "Authentication: Passport.js or Auth0",
+            "Deployment: AWS, Azure, Vercel, or Netlify"
+          ],
+          "rules": [
+            "Ideal for full-stack JavaScript/TypeScript teams",
+            "Excellent for microservices and serverless",
+            "Strong community and rapid development"
+          ]
+        }
+      ],
+      "care_type_message": "Node.js + TypeScript offers flexibility and a rich ecosystem.",
+      "final_result": {
+        "resolution_button_label": "See Node.js template",
+        "resolution_button_url": "https://api.decisionspark.com/templates/nodejs",
+        "analytics_resolution_code": "ROUTE_NODEJS"
+      }
+    },
+    {
+      "outcome_id": "PYTHON_STACK",
+      "selection_rules": [
+        "PYTHON in preferred_languages",
+        "DATABASE in required_features or API in required_features"
+      ],
+      "display_cards": [
+        {
+          "title": "Python Stack (FastAPI or Django) 🐍",
+          "subtitle": "Simple, productive, great for data",
+          "group_id": "tech_recommendation",
+          "care_type_message": "Python offers rapid development and excellent data handling.",
+          "icon_url": "https://api.decisionspark.com/icons/python.png",
+          "body_text": [
+            "✅ FastAPI for high-performance APIs",
+            "✅ Django for full-featured web apps",
+            "✅ Great for data science and ML integration",
+            "✅ Simple, readable syntax"
+          ],
+          "care_type_details": [
+            "Frontend: React/Vue or Django templates",
+            "Database: PostgreSQL with SQLAlchemy or Django ORM",
+            "Caching: Redis",
+            "Authentication: Django Auth or OAuth2",
+            "Deployment: AWS, Azure, or Heroku"
+          ],
+          "rules": [
+            "Perfect for teams who value developer productivity",
+            "Excellent if you need data processing or ML",
+            "Strong scientific and academic community"
+          ]
+        }
+      ],
+      "care_type_message": "Python provides rapid development with powerful libraries.",
+      "final_result": {
+        "resolution_button_label": "See Python template",
+        "resolution_button_url": "https://api.decisionspark.com/templates/python",
+        "analytics_resolution_code": "ROUTE_PYTHON"
+      }
+    },
+    {
+      "outcome_id": "GO_MICROSERVICES",
+      "selection_rules": [
+        "GO in preferred_languages",
+        "needs_high_performance == true",
+        "is_large_team == true or deployment_target == 'CLOUD'"
+      ],
+      "display_cards": [
+        {
+          "title": "Go Microservices Stack 🔷",
+          "subtitle": "Fast, simple, cloud-native",
+          "group_id": "tech_recommendation",
+          "care_type_message": "Go is perfect for high-performance microservices.",
+          "icon_url": "https://api.decisionspark.com/icons/golang.png",
+          "body_text": [
+            "✅ Blazing fast performance",
+            "✅ Simple concurrency with goroutines",
+            "✅ Small binaries, easy deployment",
+            "✅ Built for cloud and Kubernetes"
+          ],
+          "care_type_details": [
+            "Frontend: React/Vue separate deployment",
+            "Database: PostgreSQL with GORM or sqlx",
+            "Caching: Redis",
+            "Authentication: JWT or OAuth2",
+            "Deployment: Kubernetes, AWS ECS, or Google Cloud Run"
+          ],
+          "rules": [
+            "Best for microservices architecture",
+            "Excellent for high-throughput systems",
+            "Shorter learning curve than Java"
+          ]
+        }
+      ],
+      "care_type_message": "Go delivers excellent performance for cloud-native applications.",
+      "final_result": {
+        "resolution_button_label": "See Go template",
+        "resolution_button_url": "https://api.decisionspark.com/templates/golang",
+        "analytics_resolution_code": "ROUTE_GO"
+      }
+    },
+    {
+      "outcome_id": "JAVA_SPRING_STACK",
+      "selection_rules": [
+        "JAVA in preferred_languages",
+        "is_large_team == true",
+        "needs_compliance == true or needs_high_performance == true"
+      ],
+      "display_cards": [
+        {
+          "title": "Java Spring Boot Stack ☕",
+          "subtitle": "Enterprise-grade, battle-tested",
+          "group_id": "tech_recommendation",
+          "care_type_message": "Java Spring Boot is the gold standard for enterprise applications.",
+          "icon_url": "https://api.decisionspark.com/icons/java.png",
+          "body_text": [
+            "✅ Spring Boot for rapid development",
+            "✅ Mature ecosystem and libraries",
+            "✅ Excellent enterprise support",
+            "✅ Strong security and compliance tools"
+          ],
+          "care_type_details": [
+            "Frontend: React/Angular or Thymeleaf",
+            "Database: PostgreSQL or Oracle with JPA/Hibernate",
+            "Caching: Redis or Hazelcast",
+            "Authentication: Spring Security + OAuth2",
+            "Deployment: AWS, Azure, or on-premise with Docker/Kubernetes"
+          ],
+          "rules": [
+            "Best for large enterprises and regulated industries",
+            "Huge talent pool and long-term support",
+            "Excellent for complex business logic"
+          ]
+        }
+      ],
+      "care_type_message": "Java Spring Boot provides enterprise reliability and compliance.",
+      "final_result": {
+        "resolution_button_label": "See Java template",
+        "resolution_button_url": "https://api.decisionspark.com/templates/java",
+        "analytics_resolution_code": "ROUTE_JAVA"
+      }
+    },
+    {
+      "outcome_id": "SIMPLE_STATIC_SITE",
+      "selection_rules": [
+        "required_features == ['NONE'] or feature_count == 0"
+      ],
+      "display_cards": [
+        {
+          "title": "Static Site Generator 📄",
+          "subtitle": "Fast, simple, no backend needed",
+          "group_id": "tech_recommendation",
+          "care_type_message": "For a simple project, a static site is the fastest path.",
+          "icon_url": "https://api.decisionspark.com/icons/static.png",
+          "body_text": [
+            "✅ No server or database needed",
+            "✅ Lightning fast performance",
+            "✅ Free or cheap hosting",
+            "✅ Easy to maintain"
+          ],
+          "care_type_details": [
+            "Tools: Next.js (static export), Hugo, Jekyll, or Astro",
+            "Hosting: Vercel, Netlify, GitHub Pages, or Cloudflare Pages",
+            "Content: Markdown files or headless CMS",
+            "Forms: Netlify Forms or third-party services"
+          ],
+          "rules": [
+            "Perfect for blogs, documentation, portfolios",
+            "Add backend features later if needed",
+            "Extremely cost-effective"
+          ]
+        }
+      ],
+      "care_type_message": "A static site is the simplest solution for your needs.",
+      "final_result": {
+        "resolution_button_label": "See static site options",
+        "resolution_button_url": "https://api.decisionspark.com/templates/static",
+        "analytics_resolution_code": "ROUTE_STATIC"
+      }
+    }
+  ],
+  "tie_strategy": {
+    "mode": "LLM_CLARIFIER",
+    "clarifier_max_attempts": 3,
+    "pseudo_traits": [
+      {
+        "key": "preference_ecosystem",
+        "question_text": "Which ecosystem appeals more to you: Microsoft (.NET/Azure) or Open Source (Node/Python/Go)?",
+        "answer_type": "enum",
+        "parse_hint": "Map to MICROSOFT, OPEN_SOURCE, or NO_PREFERENCE",
+        "required": false,
+        "is_pseudo_trait": true,
+        "options": [
+          {
+            "id": "microsoft",
+            "label": "Microsoft (.NET, Azure, Visual Studio)",
+            "value": "MICROSOFT",
+            "confidence": 0.90
+          },
+          {
+            "id": "open-source",
+            "label": "Open Source (Linux, community-driven)",
+            "value": "OPEN_SOURCE",
+            "confidence": 0.88
+          },
+          {
+            "id": "no-preference",
+            "label": "No preference",
+            "value": "NO_PREFERENCE",
+            "confidence": 0.75,
+            "is_negative": true
+          }
+        ],
+        "mapping": {
+          "DOTNET_STACK": ["MICROSOFT"],
+          "NODEJS_TYPESCRIPT_STACK": ["OPEN_SOURCE"],
+          "PYTHON_STACK": ["OPEN_SOURCE"],
+          "GO_MICROSERVICES": ["OPEN_SOURCE"],
+          "JAVA_SPRING_STACK": ["MICROSOFT", "OPEN_SOURCE"]
+        }
+      }
+    ],
+    "llm_prompt_template": "Given these technology stacks: {{summaries}}. Ask ONE clarifying question to help choose between them based on the team's preferences or project constraints."
+  },
+  "disambiguation": {
+    "fallback_trait_order": [
+      "preferred_languages",
+      "performance_priority",
+      "deployment_target",
+      "team_size"
+    ]
+  }
+}
