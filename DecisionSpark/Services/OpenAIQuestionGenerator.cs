@@ -227,19 +227,20 @@ Make it sound friendly and easy to understand while collecting the same informat
 
     private bool DetermineAllowFreeText(TraitDefinition trait)
     {
-        // Always allow free text for non-enum types
+        // Always allow free text for non-enum types (string, integer, integer_list)
         if (trait.AnswerType != "enum" && trait.AnswerType != "enum_list")
         {
             return true;
         }
 
-        // For enums with options, allow custom input as fallback
+        // For enums with structured options, do NOT allow free text
+        // Users must select from the provided options (radio buttons or checkboxes)
         if (trait.Options != null && trait.Options.Count > 0)
         {
-            return true; // FR-006: "Type my own answer" always available
+            return false; // Enforce structured selection for UI clarity
         }
 
-        // Default to allowing free text
+        // Default: if no options available, allow free text as fallback
         return true;
     }
 

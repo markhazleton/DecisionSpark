@@ -1,5 +1,6 @@
 using DecisionSpark.Common;
 using DecisionSpark.Models.Api;
+using DecisionSpark.Models.Spec;
 using DecisionSpark.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,6 +24,7 @@ public class ConversationController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly IUserSelectionService _userSelectionService;
     private readonly IQuestionPresentationDecider _questionPresentationDecider;
+    private readonly IConversationPersistence _conversationPersistence;
 
     public ConversationController(
         ILogger<ConversationController> logger,
@@ -34,7 +36,8 @@ public class ConversationController : ControllerBase
         ITraitParser traitParser,
         IConfiguration configuration,
         IUserSelectionService userSelectionService,
-        IQuestionPresentationDecider questionPresentationDecider)
+        IQuestionPresentationDecider questionPresentationDecider,
+        IConversationPersistence conversationPersistence)
     {
         _logger = logger;
         _sessionStore = sessionStore;
@@ -46,6 +49,7 @@ public class ConversationController : ControllerBase
         _configuration = configuration;
         _userSelectionService = userSelectionService;
         _questionPresentationDecider = questionPresentationDecider;
+        _conversationPersistence = conversationPersistence;
     }
 
     /// <summary>
@@ -126,10 +130,10 @@ public class ConversationController : ControllerBase
                 return BadRequest(new { error = Constants.ErrorCodes.SESSION_STATE_INVALID, message = "Session state invalid" });
             }
 
-            var traitDef = spec.Traits.FirstOrDefault(t => t.Key == awaitingTraitKey);
+            var traitDef = FindTraitDefinition(spec, awaitingTraitKey);
             if (traitDef == null)
             {
-                _logger.LogError("Trait {TraitKey} not found in spec", awaitingTraitKey);
+                _logger.LogError("Trait {TraitKey} not found in spec (checked both traits and pseudo_traits)", awaitingTraitKey);
                 return BadRequest(new { error = Constants.ErrorCodes.SESSION_STATE_INVALID, message = "Invalid trait key" });
             }
 
@@ -250,6 +254,9 @@ public class ConversationController : ControllerBase
             // Save session
             await _sessionStore.SaveAsync(session);
 
+            // Persist conversation to disk
+            await _conversationPersistence.SaveConversationAsync(session);
+
             // Map response with HttpContext
             _responseMapper.SetHttpContext(HttpContext);
             var answeredCount = session.KnownTraits.Count(kv => spec.Traits.Any(t => t.Key == kv.Key && !t.IsPseudoTrait));
@@ -272,5 +279,21 @@ public class ConversationController : ControllerBase
             _logger.LogError(ex, "Error in Next endpoint for session {SessionId}", sessionId);
             return StatusCode(500, new { error = Constants.ErrorCodes.INTERNAL_ERROR, message = "Internal server error" });
         }
+    }
+
+    /// <summary>
+    /// Finds a trait definition by key, checking both regular traits and pseudo traits
+    /// </summary>
+    private TraitDefinition? FindTraitDefinition(DecisionSpec spec, string traitKey)
+    {
+        // First check regular traits
+        var trait = spec.Traits.FirstOrDefault(t => t.Key == traitKey);
+        if (trait != null)
+        {
+            return trait;
+        }
+
+        // Then check pseudo traits in tie strategy
+        return spec.TieStrategy?.PseudoTraits?.FirstOrDefault(t => t.Key == traitKey);
     }
 }

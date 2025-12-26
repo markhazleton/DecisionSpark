@@ -4,7 +4,8 @@ namespace DecisionSpark.Models.Api;
 
 public class StartRequest
 {
-    // Empty for now, may extend to allow initial trait values
+    [JsonPropertyName("spec_id")]
+    public string? SpecId { get; set; }
 }
 
 public class NextRequest

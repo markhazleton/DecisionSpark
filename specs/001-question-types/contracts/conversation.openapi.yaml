@@ -219,7 +219,7 @@ components:
           description: LLM confidence in the question/options (0.0-1.0)
         allowFreeText:
           type: boolean
-          description: Whether custom text input is permitted (FR-006)
+          description: Whether custom text input is permitted (FR-006); true for text/integer types, false for enum/enum_list with structured options
         validationHints:
           type: array
           description: Error messages from previous validation attempts

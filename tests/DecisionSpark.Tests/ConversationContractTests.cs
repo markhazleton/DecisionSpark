@@ -84,7 +84,7 @@ public class ConversationContractTests
         // Arrange: Simulate a legacy client that doesn't know about new fields
         var json = @"{
             ""is_complete"": false,
-            ""texts"": [""Thanks! One quick question.""],
+            ""texts"": [""Thanks! Let me ask you a few questions.""],
             ""question"": {
                 ""id"": ""test_trait"",
                 ""source"": ""TEST_SPEC"",

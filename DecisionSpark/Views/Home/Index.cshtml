@@ -281,9 +281,12 @@ border-radius: 10px;
          <div class="input-area mt-3" id="inputArea" style="display: none;">
      <form id="answerForm">
         <div class="mb-3">
-     <label for="userInput" class="form-label fw-bold">Your Answer:</label>
-         <textarea class="form-control form-control-lg" id="userInput" rows="2" 
+     <label for="inputContainer" class="form-label fw-bold">Your Answer:</label>
+         <div id="inputContainer">
+             <!-- Dynamic input will be rendered here -->
+             <textarea class="form-control form-control-lg" id="userInput" rows="2" 
     placeholder="Type your answer here..." required></textarea>
+         </div>
                <div class="form-text" id="inputHint"></div>
        </div>
      <div class="d-flex justify-content-between align-items-center">
@@ -305,6 +308,14 @@ border-radius: 10px;
         <h5 class="mb-0"><i class="bi bi-gear-fill"></i> Controls</h5>
    </div>
         <div class="card-body">
+           <!-- Spec Selector -->
+           <div class="mb-3">
+               <label for="specSelector" class="form-label fw-bold">Select Scenario:</label>
+               <select class="form-select" id="specSelector">
+                   <option value="">Loading...</option>
+               </select>
+           </div>
+           
            <button class="btn btn-success w-100 mb-2" id="startBtn" onclick="startConversation()">
          <i class="bi bi-play-circle-fill"></i> Start New Conversation
          </button>
@@ -530,7 +541,10 @@ ${JSON.stringify(entry.data, null, 2)}
                     'Content-Type': 'application/json',
                     'X-API-KEY': API_KEY
                 };
-                const requestBody = {};
+                
+                // Get selected spec
+                const selectedSpec = document.getElementById('specSelector').value;
+                const requestBody = selectedSpec ? { spec_id: selectedSpec } : {};
 
                 addDebugEntry('success', '?? Starting Conversation', {
                     url: requestUrl,
@@ -606,16 +620,48 @@ ${JSON.stringify(entry.data, null, 2)}
         document.getElementById('answerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const userInput = document.getElementById('userInput').value.trim();
+            // Get user input based on input type
+            let userInput = '';
+            let requestBody = {};
+            
+            // Check if radio buttons exist
+            const selectedRadio = document.querySelector('input[name="selectedOption"]:checked');
+            if (selectedRadio) {
+                userInput = selectedRadio.value;
+                requestBody = { 
+                    selected_option_ids: [selectedRadio.closest('.form-check').querySelector('input').id.replace('option_', '')]
+                };
+            } else {
+                // Check if checkboxes exist
+                const selectedCheckboxes = document.querySelectorAll('input[name="selectedOptions"]:checked');
+                if (selectedCheckboxes.length > 0) {
+                    const optionIds = Array.from(selectedCheckboxes).map(cb => 
+                        cb.id.replace('option_', '')
+                    );
+                    userInput = Array.from(selectedCheckboxes).map(cb => cb.value).join(', ');
+                    requestBody = { selected_option_ids: optionIds };
+                } else {
+                    // Text input
+                    const textInput = document.getElementById('userInput');
+                    if (!textInput) return;
+                    userInput = textInput.value.trim();
+                    if (!userInput) return;
+                    requestBody = { user_input: userInput };
+                }
+            }
+            
             if (!userInput || !currentNextUrl) return;
 
             try {
                 document.getElementById('sendBtn').disabled = true;
-                document.getElementById('sendBtn').innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+                document.getElementById('sendBtn').innerHTML = '<span class=\"spinner-border spinner-border-sm me-2\"></span>Sending...';
 
                 // Show user's answer
                 addMessage('user', userInput);
-                document.getElementById('userInput').value = '';
+                
+                // Clear input
+                const textInput = document.getElementById('userInput');
+                if (textInput) textInput.value = '';
 
                 // Construct full URL
                 const fullUrl = currentNextUrl.startsWith('http') 
@@ -626,14 +672,13 @@ ${JSON.stringify(entry.data, null, 2)}
                     'Content-Type': 'application/json',
                     'X-API-KEY': API_KEY
                 };
-                const requestBody = { user_input: userInput };
 
                 addDebugEntry('success', '?? Sending Answer', {
                     url: fullUrl,
                     method: 'POST',
                     headers: requestHeaders,
                     body: requestBody,
-                    note: 'Property name: user_input (snake_case)'
+                    note: requestBody.selected_option_ids ? 'Using selected_option_ids array' : 'Property name: user_input (snake_case)'
                 });
 
                 const response = await fetch(fullUrl, {
@@ -796,43 +841,111 @@ ${JSON.stringify(entry.data, null, 2)}
             conversationArea.scrollTop = conversationArea.scrollHeight;
         }
 
-        // Show input area with quick actions
+        // Show input area with dynamic rendering based on question type
         function showInputArea(question) {
             const inputArea = document.getElementById('inputArea');
-            inputArea.style.display = 'block';
-            
-            // Set hint based on question type
+            const inputContainer = document.getElementById('inputContainer');
             const hintDiv = document.getElementById('inputHint');
-            if (question.allowFreeText) {
-                hintDiv.textContent = 'Answer naturally. Examples: "5 people", "ages: 4, 9, 35, 40"';
-            } else {
-                hintDiv.textContent = 'Select or type your answer';
-            }
-
-            // Add quick action examples
             const quickActionsDiv = document.getElementById('quickActions');
+            
+            inputArea.style.display = 'block';
             quickActionsDiv.innerHTML = '';
 
-            // Determine example answers based on question ID
-            let examples = [];
-            if (question.id === 'group_size') {
-                examples = ['3', '5 people', '10'];
-            } else if (question.id === 'all_ages') {
-                examples = ['8, 10, 35, 40', '4, 6, 35', '18, 25, 30'];
+            // Render based on question type
+            if (question.type === 'single-select' && question.options && question.options.length > 0) {
+                // Render radio buttons
+                inputContainer.innerHTML = '';
+                question.options.forEach((option, index) => {
+                    const radioDiv = document.createElement('div');
+                    radioDiv.className = 'form-check mb-2';
+                    
+                    const radioInput = document.createElement('input');
+                    radioInput.className = 'form-check-input';
+                    radioInput.type = 'radio';
+                    radioInput.name = 'selectedOption';
+                    radioInput.id = `option_${option.id}`;
+                    radioInput.value = option.value;
+                    radioInput.required = index === 0; // Only first needs required
+                    
+                    const radioLabel = document.createElement('label');
+                    radioLabel.className = 'form-check-label';
+                    radioLabel.htmlFor = `option_${option.id}`;
+                    radioLabel.textContent = option.label;
+                    
+                    radioDiv.appendChild(radioInput);
+                    radioDiv.appendChild(radioLabel);
+                    inputContainer.appendChild(radioDiv);
+                });
+                
+                hintDiv.textContent = 'Select one option';
+                
+            } else if (question.type === 'multi-select' && question.options && question.options.length > 0) {
+                // Render checkboxes
+                inputContainer.innerHTML = '';
+                question.options.forEach(option => {
+                    const checkDiv = document.createElement('div');
+                    checkDiv.className = 'form-check mb-2';
+                    
+                    const checkInput = document.createElement('input');
+                    checkInput.className = 'form-check-input';
+                    checkInput.type = 'checkbox';
+                    checkInput.name = 'selectedOptions';
+                    checkInput.id = `option_${option.id}`;
+                    checkInput.value = option.value;
+                    
+                    const checkLabel = document.createElement('label');
+                    checkLabel.className = 'form-check-label';
+                    checkLabel.htmlFor = `option_${option.id}`;
+                    checkLabel.textContent = option.label;
+                    
+                    if (option.isNegative) {
+                        const badge = document.createElement('span');
+                        badge.className = 'badge bg-secondary ms-2';
+                        badge.textContent = 'Clears others';
+                        checkLabel.appendChild(badge);
+                    }
+                    
+                    checkDiv.appendChild(checkInput);
+                    checkDiv.appendChild(checkLabel);
+                    inputContainer.appendChild(checkDiv);
+                });
+                
+                hintDiv.textContent = 'Select one or more options';
+                
+            } else {
+                // Render text input (default)
+                inputContainer.innerHTML = `
+                    <textarea class="form-control form-control-lg" id="userInput" rows="2" 
+                        placeholder="Type your answer here..." required></textarea>
+                `;
+                
+                if (question.allowFreeText) {
+                    hintDiv.textContent = 'Answer naturally. Examples: "5 people", "ages: 4, 9, 35, 40"';
+                } else {
+                    hintDiv.textContent = 'Type your answer';
+                }
+
+                // Add quick action examples for specific questions
+                let examples = [];
+                if (question.id === 'group_size' || question.id === 'team_size') {
+                    examples = ['3', '5 people', '10'];
+                } else if (question.id === 'all_ages') {
+                    examples = ['8, 10, 35, 40', '4, 6, 35', '18, 25, 30'];
+                }
+
+                examples.forEach(example => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn btn-outline-secondary btn-sm quick-action-btn';
+                    btn.textContent = example;
+                    btn.onclick = () => {
+                        document.getElementById('userInput').value = example;
+                    };
+                    quickActionsDiv.appendChild(btn);
+                });
+
+                document.getElementById('userInput').focus();
             }
-
-            examples.forEach(example => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'btn btn-outline-secondary btn-sm quick-action-btn';
-                btn.textContent = example;
-                btn.onclick = () => {
-                    document.getElementById('userInput').value = example;
-                };
-                quickActionsDiv.appendChild(btn);
-            });
-
-            document.getElementById('userInput').focus();
         }
 
         // Update session display
@@ -940,6 +1053,45 @@ ${JSON.stringify(entry.data, null, 2)}
                 addMessage('error', 'Failed to run scenario: ' + error.message);
             }
         }
+
+        // Load available specs on page load
+        async function loadSpecs() {
+            try {
+                const response = await fetch(`${BASE_URL}/start/specs`, {
+                    headers: { 'X-API-KEY': API_KEY }
+                });
+                
+                if (!response.ok) {
+                    console.error('Failed to load specs:', response.status);
+                    return;
+                }
+                
+                const data = await response.json();
+                const specSelector = document.getElementById('specSelector');
+                
+                specSelector.innerHTML = '';
+                
+                if (data.specs && data.specs.length > 0) {
+                    data.specs.forEach(spec => {
+                        const option = document.createElement('option');
+                        option.value = spec.specId;
+                        option.textContent = spec.displayName + (spec.isDefault ? ' (Default)' : '');
+                        option.selected = spec.isDefault;
+                        specSelector.appendChild(option);
+                    });
+                } else {
+                    specSelector.innerHTML = '<option value="">No specs available</option>';
+                }
+            } catch (error) {
+                console.error('Error loading specs:', error);
+                document.getElementById('specSelector').innerHTML = '<option value="">Error loading specs</option>';
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSpecs();
+        });
 
         // Expose functions to global scope for onclick handlers
         window.startConversation = startConversation;

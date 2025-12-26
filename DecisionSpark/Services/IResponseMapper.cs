@@ -105,9 +105,22 @@ response.RawResponse = outcome.FinalResult.AnalyticsResolutionCode;
     private void MapQuestionResponse(dynamic response, TraitDefinition trait, DecisionSpec spec, QuestionGenerationResult? questionResult, DecisionSession session)
     {
         response.IsComplete = false;
-        response.Texts = session.RetryAttempt > 0 
-            ? new List<string> { "Let me rephrase that." }
-            : new List<string> { "Thanks! One quick question." };
+        
+        // Contextual greeting based on question count
+        string greetingText;
+        if (session.RetryAttempt > 0)
+        {
+            greetingText = "Let me rephrase that.";
+        }
+        else if (session.KnownTraits.Count == 0)
+        {
+            greetingText = "Thanks! Let me ask you a few questions.";
+        }
+        else
+        {
+            greetingText = "Thanks! Next question.";
+        }
+        response.Texts = new List<string> { greetingText };
 
         // Use QuestionPresentationDecider to determine the question type
         var questionType = _questionPresentationDecider.DecideQuestionType(trait, session);
@@ -127,7 +140,7 @@ response.RawResponse = outcome.FinalResult.AnalyticsResolutionCode;
             Id = trait.Key,
             Source = spec.SpecId,
             Text = questionResult?.QuestionText ?? trait.QuestionText,
-            AllowFreeText = metadata.AllowFreeText ?? true, // Default to true per FR-006
+            AllowFreeText = metadata.AllowFreeText ?? (questionType == "text"), // Use metadata, fallback to true only for text type
             IsFreeText = questionType == "text",
             AllowMultiSelect = questionType == "multi-select",
             IsMultiSelect = questionType == "multi-select",

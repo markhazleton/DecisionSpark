@@ -137,6 +137,12 @@ public class QuestionPresentationDecider : IQuestionPresentationDecider
             return "single-select";
         }
 
+        // For enum_list types, always use multi-select
+        if (trait.AnswerType == "enum_list" && trait.Options != null && trait.Options.Count > 0)
+        {
+            return "multi-select";
+        }
+
         // For integer_list types, use multi-select if options available
         if (trait.AnswerType == "integer_list" && trait.Options != null && trait.Options.Count > 0)
         {

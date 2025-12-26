@@ -46,38 +46,8 @@
       "required": true,
       "is_pseudo_trait": false,
       "depends_on": [],
-      "options": [
-        {
-          "id": "cloud",
-          "label": "Cloud (AWS, Azure, GCP)",
-          "value": "CLOUD",
-          "tooltip": "Fully managed cloud infrastructure",
-          "confidence": 0.92
-        },
-        {
-          "id": "on-premise",
-          "label": "On-Premise (Own servers)",
-          "value": "ON_PREMISE",
-          "tooltip": "Your own data center or hardware",
-          "confidence": 0.88
-        },
-        {
-          "id": "hybrid",
-          "label": "Hybrid (Mix of both)",
-          "value": "HYBRID",
-          "tooltip": "Some cloud, some on-premise",
-          "confidence": 0.85
-        },
-        {
-          "id": "undecided",
-          "label": "Not sure yet",
-          "value": "UNDECIDED",
-          "tooltip": "Still evaluating options",
-          "confidence": 0.75,
-          "is_negative": true
-        }
-      ],
-      "comment": "SINGLE-SELECT - Radio buttons with tooltips and confidence scores. Demonstrates negative option."
+      "options": ["CLOUD", "ON_PREMISE", "HYBRID", "UNDECIDED"],
+      "comment": "SINGLE-SELECT - Shows enum options for deployment choice"
     },
     {
       "key": "required_features",
@@ -88,60 +58,8 @@
       "is_pseudo_trait": false,
       "depends_on": ["deployment_target"],
       "allow_multiple": true,
-      "max_selections": 7,
-      "options": [
-        {
-          "id": "authentication",
-          "label": "User Authentication & Authorization",
-          "value": "AUTHENTICATION",
-          "tooltip": "Login, signup, roles, permissions",
-          "confidence": 0.95
-        },
-        {
-          "id": "database",
-          "label": "Database (SQL or NoSQL)",
-          "value": "DATABASE",
-          "tooltip": "Persistent data storage",
-          "confidence": 0.93
-        },
-        {
-          "id": "api",
-          "label": "REST or GraphQL API",
-          "value": "API",
-          "tooltip": "Expose endpoints for clients",
-          "confidence": 0.91
-        },
-        {
-          "id": "real-time",
-          "label": "Real-time Communication (WebSockets, SignalR)",
-          "value": "REAL_TIME",
-          "tooltip": "Live updates, chat, notifications",
-          "confidence": 0.87
-        },
-        {
-          "id": "file-storage",
-          "label": "File Upload/Storage",
-          "value": "FILE_STORAGE",
-          "tooltip": "Handle images, documents, media",
-          "confidence": 0.89
-        },
-        {
-          "id": "caching",
-          "label": "Caching Layer (Redis, Memcached)",
-          "value": "CACHING",
-          "tooltip": "Improve performance with caching",
-          "confidence": 0.84
-        },
-        {
-          "id": "none-needed",
-          "label": "None of these / Very simple app",
-          "value": "NONE",
-          "tooltip": "Basic static or minimal functionality",
-          "confidence": 0.78,
-          "is_negative": true
-        }
-      ],
-      "comment": "MULTI-SELECT - Checkboxes with max 7 selections. Demonstrates negative option that clears others when selected."
+      "options": ["AUTHENTICATION", "DATABASE", "API", "REAL_TIME", "FILE_STORAGE", "CACHING", "NONE"],
+      "comment": "MULTI-SELECT - Multiple feature selection (negative option NONE clears others)"
     },
     {
       "key": "performance_priority",
@@ -151,37 +69,8 @@
       "required": true,
       "is_pseudo_trait": false,
       "depends_on": ["required_features"],
-      "options": [
-        {
-          "id": "critical",
-          "label": "Critical - Must handle high load",
-          "value": "CRITICAL",
-          "tooltip": "Millions of users, real-time requirements",
-          "confidence": 0.94
-        },
-        {
-          "id": "important",
-          "label": "Important - Should scale well",
-          "value": "IMPORTANT",
-          "tooltip": "Thousands of users, steady growth",
-          "confidence": 0.90
-        },
-        {
-          "id": "moderate",
-          "label": "Moderate - Normal performance is fine",
-          "value": "MODERATE",
-          "tooltip": "Hundreds of users, occasional spikes",
-          "confidence": 0.86
-        },
-        {
-          "id": "not-priority",
-          "label": "Not a priority - Internal tool or prototype",
-          "value": "NOT_PRIORITY",
-          "tooltip": "Small user base, development speed matters more",
-          "confidence": 0.82
-        }
-      ],
-      "comment": "SINGLE-SELECT - All options with different confidence scores"
+      "options": ["CRITICAL", "IMPORTANT", "MODERATE", "NOT_PRIORITY"],
+      "comment": "SINGLE-SELECT - Performance priority selection"
     },
     {
       "key": "preferred_languages",
@@ -192,60 +81,8 @@
       "is_pseudo_trait": false,
       "depends_on": ["team_size"],
       "allow_multiple": true,
-      "max_selections": 5,
-      "options": [
-        {
-          "id": "csharp",
-          "label": "C# / .NET",
-          "value": "CSHARP",
-          "tooltip": "Enterprise-ready, strong typing, great tooling",
-          "confidence": 0.92
-        },
-        {
-          "id": "javascript",
-          "label": "JavaScript",
-          "value": "JAVASCRIPT",
-          "tooltip": "Universal language, huge ecosystem",
-          "confidence": 0.95
-        },
-        {
-          "id": "typescript",
-          "label": "TypeScript",
-          "value": "TYPESCRIPT",
-          "tooltip": "JavaScript with type safety",
-          "confidence": 0.93
-        },
-        {
-          "id": "python",
-          "label": "Python",
-          "value": "PYTHON",
-          "tooltip": "Simple syntax, great for data/ML",
-          "confidence": 0.91
-        },
-        {
-          "id": "java",
-          "label": "Java",
-          "value": "JAVA",
-          "tooltip": "Mature ecosystem, enterprise standard",
-          "confidence": 0.89
-        },
-        {
-          "id": "go",
-          "label": "Go",
-          "value": "GO",
-          "tooltip": "Fast, simple, great for microservices",
-          "confidence": 0.87
-        },
-        {
-          "id": "none",
-          "label": "None of these / Open to learning",
-          "value": "NONE",
-          "tooltip": "We'll learn whatever works best",
-          "confidence": 0.75,
-          "is_negative": true
-        }
-      ],
-      "comment": "MULTI-SELECT with negative option - 'None' clears all other language selections"
+      "options": ["CSHARP", "JAVASCRIPT", "TYPESCRIPT", "PYTHON", "JAVA", "GO", "NONE"],
+      "comment": "MULTI-SELECT - Programming language preferences (NONE is negative option)"
     },
     {
       "key": "timeline_constraint",
@@ -255,44 +92,8 @@
       "required": true,
       "is_pseudo_trait": false,
       "depends_on": ["team_size"],
-      "options": [
-        {
-          "id": "weeks",
-          "label": "2-4 weeks",
-          "value": "WEEKS",
-          "tooltip": "Very tight deadline",
-          "confidence": 0.88
-        },
-        {
-          "id": "months",
-          "label": "2-3 months",
-          "value": "MONTHS",
-          "tooltip": "Standard startup timeline",
-          "confidence": 0.92
-        },
-        {
-          "id": "quarter",
-          "label": "This quarter (3-4 months)",
-          "value": "QUARTER",
-          "tooltip": "Business planning cycle",
-          "confidence": 0.90
-        },
-        {
-          "id": "year",
-          "label": "This year (6-12 months)",
-          "value": "YEAR",
-          "tooltip": "Long-term project",
-          "confidence": 0.85
-        },
-        {
-          "id": "flexible",
-          "label": "No specific deadline",
-          "value": "FLEXIBLE",
-          "tooltip": "We'll take the time needed",
-          "confidence": 0.80
-        }
-      ],
-      "comment": "SINGLE-SELECT - Timeline options with varying confidence"
+      "options": ["WEEKS", "MONTHS", "QUARTER", "YEAR", "FLEXIBLE"],
+      "comment": "SINGLE-SELECT - Timeline selection"
     },
     {
       "key": "compliance_requirements",
@@ -303,46 +104,8 @@
       "is_pseudo_trait": false,
       "depends_on": ["deployment_target"],
       "allow_multiple": true,
-      "max_selections": 4,
-      "options": [
-        {
-          "id": "hipaa",
-          "label": "HIPAA (Healthcare data)",
-          "value": "HIPAA",
-          "tooltip": "Protected health information",
-          "confidence": 0.96
-        },
-        {
-          "id": "gdpr",
-          "label": "GDPR (EU privacy)",
-          "value": "GDPR",
-          "tooltip": "European data protection",
-          "confidence": 0.94
-        },
-        {
-          "id": "soc2",
-          "label": "SOC 2 (Security audit)",
-          "value": "SOC2",
-          "tooltip": "Enterprise security standards",
-          "confidence": 0.92
-        },
-        {
-          "id": "pci-dss",
-          "label": "PCI DSS (Payment card data)",
-          "value": "PCI_DSS",
-          "tooltip": "Credit card processing",
-          "confidence": 0.95
-        },
-        {
-          "id": "no-compliance",
-          "label": "None / Not applicable",
-          "value": "NONE",
-          "tooltip": "No special compliance needed",
-          "confidence": 0.85,
-          "is_negative": true
-        }
-      ],
-      "comment": "MULTI-SELECT with negative option - 'None' is exclusive and clears other compliance selections"
+      "options": ["HIPAA", "GDPR", "SOC2", "PCI_DSS", "NONE"],
+      "comment": "MULTI-SELECT - Compliance requirements (NONE is negative option)"
     }
   ],
   "derived_traits": [
@@ -636,27 +399,7 @@
         "parse_hint": "Map to MICROSOFT, OPEN_SOURCE, or NO_PREFERENCE",
         "required": false,
         "is_pseudo_trait": true,
-        "options": [
-          {
-            "id": "microsoft",
-            "label": "Microsoft (.NET, Azure, Visual Studio)",
-            "value": "MICROSOFT",
-            "confidence": 0.90
-          },
-          {
-            "id": "open-source",
-            "label": "Open Source (Linux, community-driven)",
-            "value": "OPEN_SOURCE",
-            "confidence": 0.88
-          },
-          {
-            "id": "no-preference",
-            "label": "No preference",
-            "value": "NO_PREFERENCE",
-            "confidence": 0.75,
-            "is_negative": true
-          }
-        ],
+        "options": ["MICROSOFT", "OPEN_SOURCE", "NO_PREFERENCE"],
         "mapping": {
           "DOTNET_STACK": ["MICROSOFT"],
           "NODEJS_TYPESCRIPT_STACK": ["OPEN_SOURCE"],

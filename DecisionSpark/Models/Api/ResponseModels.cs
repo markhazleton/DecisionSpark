@@ -85,3 +85,16 @@ public class ErrorDto
     public string Code { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
 }
+
+public class SpecListResponse
+{
+    public List<SpecInfo> Specs { get; set; } = new();
+}
+
+public class SpecInfo
+{
+    public string SpecId { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public bool IsDefault { get; set; }
+}
