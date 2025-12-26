@@ -1,0 +1,286 @@
+openapi: 3.0.3
+info:
+  title: DecisionSpark Conversation API
+  version: 1.1.0
+  description: >-
+    Extends the existing /start and /conversation/{sessionId}/next endpoints to support
+    structured option selection, deterministic option identifiers, and UI metadata for
+    multi-modal question rendering.
+servers:
+  - url: https://api.decisionspark.local
+paths:
+  /start:
+    post:
+      summary: Start a new decision session
+      operationId: startConversation
+      requestBody:
+        description: Reserved for future initial traits. Currently empty JSON object.
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartRequest'
+      responses:
+        '200':
+          description: Session started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /conversation/{sessionId}/next:
+    post:
+      summary: Submit an answer and fetch the next question/result
+      operationId: submitAnswer
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 12-character session token returned by /start
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NextRequest'
+      responses:
+        '200':
+          description: Answer accepted; returns either the next question or final recommendation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NextResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    StartRequest:
+      type: object
+      description: Empty body placeholder for future initial traits
+    StartResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            question:
+              $ref: '#/components/schemas/QuestionDto'
+    NextRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        user_input:
+          type: string
+          description: Free-text response; ignored when structured selections are accepted.
+        selected_option_ids:
+          type: array
+          description: Deterministic option slugs provided by the UI controls.
+          items:
+            type: string
+            pattern: '^[a-z0-9_]+$'
+        selected_option_texts:
+          type: array
+          description: Legacy compatibility path; maintained for clients that cannot adopt IDs immediately.
+          deprecated: true
+          items:
+            type: string
+      anyOf:
+        - required: [user_input]
+        - required: [selected_option_ids]
+      example:
+        selected_option_ids: ["option-fever", "option-cough"]
+        user_input: "Also feeling tired"
+    NextResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            prevUrl:
+              type: string
+              format: uri
+            question:
+              $ref: '#/components/schemas/QuestionDto'
+            error:
+              $ref: '#/components/schemas/ErrorDto'
+    BaseResponse:
+      type: object
+      properties:
+        isComplete:
+          type: boolean
+        texts:
+          type: array
+          items:
+            type: string
+        displayCards:
+          type: array
+          items:
+            $ref: '#/components/schemas/DisplayCardDto'
+        careTypeMessage:
+          type: string
+        finalResult:
+          $ref: '#/components/schemas/FinalResultDto'
+        rawResponse:
+          type: string
+        nextUrl:
+          type: string
+          format: uri
+    QuestionDto:
+      type: object
+      required:
+        - id
+        - source
+        - text
+        - type
+        - allowFreeText
+        - isFreeText
+        - allowMultiSelect
+        - isMultiSelect
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        text:
+          type: string
+        type:
+          type: string
+          enum: [text, single-select, multi-select]
+        allowFreeText:
+          type: boolean
+        isFreeText:
+          type: boolean
+        allowMultiSelect:
+          type: boolean
+        isMultiSelect:
+          type: boolean
+        retryAttempt:
+          type: integer
+          minimum: 0
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionOptionDto'
+        metadata:
+          $ref: '#/components/schemas/QuestionMetadataDto'
+    QuestionOptionDto:
+      type: object
+      required:
+        - id
+        - label
+        - value
+        - isNegative
+      properties:
+        id:
+          type: string
+          description: Deterministic slug (snake_case)
+        label:
+          type: string
+        value:
+          type: string
+          description: Canonical value stored in KnownTraits
+        isNegative:
+          type: boolean
+        isDefault:
+          type: boolean
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+      example:
+        id: "none-of-the-above"
+        label: "None of the above"
+        value: "none"
+        isNegative: true
+        isDefault: false
+        confidence: 0.9
+    QuestionMetadataDto:
+      type: object
+      properties:
+        llmReasoning:
+          type: string
+          description: Short explanation of why the LLM chose this control type/options.
+        confidence:
+          type: number
+          format: float
+          description: LLM confidence in the question/options (0.0-1.0)
+        allowFreeText:
+          type: boolean
+          description: Whether custom text input is permitted (FR-006); true for text/integer types, false for enum/enum_list with structured options
+        validationHints:
+          type: array
+          description: Error messages from previous validation attempts
+          items:
+            type: string
+      example:
+        llmReasoning: "Single selection required per trait configuration"
+        confidence: 0.9
+        allowFreeText: true
+        validationHints: []
+    DisplayCardDto:
+      type: object
+      properties:
+        title:
+          type: string
+        subtitle:
+          type: string
+        groupId:
+          type: string
+        careTypeMessage:
+          type: string
+        iconUrl:
+          type: string
+        bodyText:
+          type: array
+          items:
+            type: string
+        careTypeDetails:
+          type: array
+          items:
+            type: string
+        rules:
+          type: array
+          items:
+            type: string
+    FinalResultDto:
+      type: object
+      properties:
+        outcomeId:
+          type: string
+        resolutionButtonLabel:
+          type: string
+        resolutionButtonUrl:
+          type: string
+        analyticsResolutionCode:
+          type: string
+    ErrorDto:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+  responses:
+    BadRequest:
+      description: Invalid input
+    Unauthorized:
+      description: API key missing/invalid
+    NotFound:
+      description: Session not found
+    PayloadTooLarge:
+      description: Input exceeded configured size
+    InternalError:
+      description: Unexpected error

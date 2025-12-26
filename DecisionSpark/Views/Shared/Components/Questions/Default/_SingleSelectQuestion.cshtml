@@ -1,0 +1,90 @@
+@model DecisionSpark.ViewModels.Question.QuestionViewModel
+
+<div class="question-container single-select-question" data-question-id="@Model.Id">
+    <div class="question-prompt">
+        <p>@Model.Prompt</p>
+        @if (Model.RetryAttempt.HasValue && Model.RetryAttempt > 0)
+        {
+            <div class="alert alert-warning" role="alert">
+                <strong>Let me try again.</strong> Please select one of the options below.
+            </div>
+        }
+    </div>
+
+    <div class="question-options" role="radiogroup" aria-label="@Model.Prompt">
+        @for (int i = 0; i < Model.Options.Count; i++)
+        {
+            var option = Model.Options[i];
+            <div class="form-check option-item @(option.IsNegative ? "negative-option" : "")">
+                <input 
+                    type="radio" 
+                    id="option-@Model.Id-@i" 
+                    name="selected_option_ids" 
+                    value="@option.Id"
+                    class="form-check-input"
+                    checked="@(option.IsSelected ? "checked" : null)"
+                    aria-label="@option.Label"
+                    data-is-negative="@option.IsNegative.ToString().ToLower()"
+                />
+                <label class="form-check-label" for="option-@Model.Id-@i">
+                    @if (option.IsTruncated)
+                    {
+                        <span title="@option.Label">@option.DisplayLabel</span>
+                    }
+                    else
+                    {
+                        @option.DisplayLabel
+                    }
+                    @if (option.IsNegative)
+                    {
+                        <span class="badge bg-secondary ms-2" aria-label="Exclusive option">None of these</span>
+                    }
+                </label>
+            </div>
+        }
+    </div>
+
+    @if (Model.ShowCustomInput)
+    {
+        <div class="custom-input-toggle mt-3">
+            <a href="#" class="toggle-custom-text" aria-expanded="false" aria-controls="custom-text-@Model.Id">
+                <i class="bi bi-pencil"></i> Type my own answer
+            </a>
+            <div id="custom-text-@Model.Id" class="custom-text-input mt-2" style="display: none;">
+                <input 
+                    type="text" 
+                    name="user_input" 
+                    class="form-control" 
+                    placeholder="Type your own answer..."
+                    aria-label="Custom text input"
+                />
+                <small class="form-text text-muted">
+                    Note: Custom text will be ignored if you've selected an option above.
+                </small>
+            </div>
+        </div>
+    }
+
+    <button 
+        type="submit" 
+        class="btn btn-primary mt-3"
+        aria-label="Submit answer">
+        Continue
+    </button>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle custom text input
+    const toggle = document.querySelector('.toggle-custom-text');
+    if (toggle) {
+        toggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            const target = document.getElementById(this.getAttribute('aria-controls'));
+            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+            this.setAttribute('aria-expanded', !isExpanded);
+            target.style.display = isExpanded ? 'none' : 'block';
+        });
+    }
+});
+</script>

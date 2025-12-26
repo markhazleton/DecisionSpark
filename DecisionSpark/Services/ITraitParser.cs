@@ -9,7 +9,7 @@ public class TraitParseResult
 
 public interface ITraitParser
 {
-    Task<TraitParseResult> ParseAsync(string userInput, string traitKey, string answerType, string parseHint);
+    Task<TraitParseResult> ParseAsync(string userInput, string traitKey, string answerType, string parseHint, Models.Runtime.DecisionSession? session = null);
 }
 
 public class TraitParser : ITraitParser
@@ -25,19 +25,32 @@ public class TraitParser : ITraitParser
         _openAIService = openAIService;
     }
 
-    public async Task<TraitParseResult> ParseAsync(string userInput, string traitKey, string answerType, string parseHint)
+    public async Task<TraitParseResult> ParseAsync(string userInput, string traitKey, string answerType, string parseHint, Models.Runtime.DecisionSession? session = null)
     {
         _logger.LogDebug("Parsing trait {TraitKey} with answer type {AnswerType}", traitKey, answerType);
         _logger.LogInformation("TraitParser received input: '{UserInput}' (Length: {Length}) for trait {TraitKey}", 
             userInput ?? "NULL", userInput?.Length ?? 0, traitKey);
+        
+        // Log validation history context if available
+        if (session != null)
+        {
+            var previousFailures = session.ValidationHistory?.Count(v => v.TraitKey == traitKey) ?? 0;
+            if (previousFailures > 0)
+            {
+                _logger.LogInformation("Trait {TraitKey} has {FailureCount} previous validation failures", 
+                    traitKey, previousFailures);
+            }
+        }
 
         try
         {
             return answerType.ToLower() switch
             {
+                "string" => await ParseStringAsync(userInput, parseHint),
                 "integer" => await ParseIntegerAsync(userInput, parseHint),
                 "integer_list" => await ParseIntegerListAsync(userInput, parseHint),
                 "enum" => await ParseEnumAsync(userInput, parseHint),
+                "enum_list" => await ParseEnumListAsync(userInput, parseHint),
                 _ => new TraitParseResult
                 {
                     IsValid = false,
@@ -53,6 +66,102 @@ public class TraitParser : ITraitParser
                 IsValid = false,
                 ErrorReason = "Unexpected error parsing input"
             };
+        }
+    }
+
+    private async Task<TraitParseResult> ParseStringAsync(string input, string parseHint)
+    {
+        _logger.LogInformation("ParseString called with input: '{Input}'", input ?? "NULL");
+        
+        // For string type, we accept the input directly or use LLM to clean/extract
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return new TraitParseResult
+            {
+                IsValid = false,
+                ErrorReason = "Please provide a response."
+            };
+        }
+
+        // Try OpenAI to extract/clean the string if available and parse hint is provided
+        if (_openAIService.IsAvailable() && !string.IsNullOrWhiteSpace(parseHint))
+        {
+            _logger.LogDebug("Using OpenAI to parse/extract string with hint: {ParseHint}", parseHint);
+            var llmResult = await ParseStringWithLLMAsync(input, parseHint);
+            if (llmResult != null && llmResult.IsValid)
+            {
+                return llmResult;
+            }
+        }
+
+        // Fallback: use the trimmed input directly
+        var cleanedInput = input.Trim();
+        _logger.LogInformation("ParseString returning direct input: '{Value}'", cleanedInput);
+        
+        return new TraitParseResult
+        {
+            IsValid = true,
+            ExtractedValue = cleanedInput
+        };
+    }
+
+    private async Task<TraitParseResult?> ParseStringWithLLMAsync(string input, string parseHint)
+    {
+        try
+        {
+            var systemPrompt = @"You are a text extractor. Your task is to extract or clean text from natural language input.
+
+Rules:
+1. Extract the relevant text based on the parse hint
+2. Return ONLY the extracted text, nothing else
+3. Do not add quotes, punctuation, or explanations
+4. If the input is already clean, return it as-is
+5. If you cannot extract anything meaningful, return the word INVALID";
+
+            var userPrompt = $@"Parse Hint: {parseHint}
+
+User Input: {input}
+
+Extract the text:";
+
+            _logger.LogDebug("Sending string parsing request to OpenAI");
+            var request = new OpenAICompletionRequest
+            {
+                SystemPrompt = systemPrompt,
+                UserPrompt = userPrompt,
+                MaxTokens = 100,
+                Temperature = 0.3f
+            };
+            var response = await _openAIService.GetCompletionAsync(request);
+            
+            if (!response.Success || string.IsNullOrWhiteSpace(response.Content))
+            {
+                _logger.LogWarning("OpenAI returned empty or failed response for string parsing: {Error}", response.ErrorMessage);
+                return null;
+            }
+
+            var extracted = response.Content.Trim();
+            _logger.LogInformation("OpenAI extracted string: '{Extracted}'", extracted);
+
+            if (extracted.Equals("INVALID", StringComparison.OrdinalIgnoreCase))
+            {
+                return new TraitParseResult
+                {
+                    IsValid = false,
+                    ErrorReason = "Could not extract a valid value from your response."
+                };
+            }
+
+            return new TraitParseResult
+            {
+                IsValid = true,
+                ExtractedValue = extracted
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error using OpenAI for string parsing");
+            return null;
         }
     }
 
@@ -301,13 +410,130 @@ Extract the list of integers (comma-separated):";
             }
         }
 
-        // Fallback: return the raw input
-        _logger.LogDebug("Returning raw input for enum: {Input}", input);
+        // Fallback: no valid match found
+        _logger.LogWarning("Could not parse enum value from input: {Input}", input);
+        return new TraitParseResult
+        {
+            IsValid = false,
+            ErrorReason = "Could not understand your response. Please try rephrasing or choose one of the suggested options."
+        };
+    }
+
+    private async Task<TraitParseResult> ParseEnumListAsync(string input, string parseHint)
+    {
+        _logger.LogInformation("ParseEnumList called with input: '{Input}'", input ?? "NULL");
+
+        // If OpenAI is available, use it to parse the list
+        if (_openAIService.IsAvailable())
+        {
+            var llmResult = await ParseEnumListWithLLMAsync(input, parseHint);
+            if (llmResult != null && llmResult.IsValid)
+            {
+                return llmResult;
+            }
+        }
+
+        // Fallback: try to extract comma-separated values
+        var values = input.Split(new char[] { ',', ';', '&' }, StringSplitOptions.RemoveEmptyEntries)
+            .SelectMany(v => v.Split(new string[] { " and " }, StringSplitOptions.RemoveEmptyEntries))
+            .Select(v => v.Trim().ToUpper().Replace(" ", "_"))
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Distinct()
+            .ToList();
+
+        if (values.Count == 0)
+        {
+            return new TraitParseResult
+            {
+                IsValid = false,
+                ErrorReason = "Please select at least one option."
+            };
+        }
+
+        _logger.LogInformation("ParseEnumList extracted {Count} values: {Values}", 
+            values.Count, string.Join(", ", values));
+
         return new TraitParseResult
         {
             IsValid = true,
-            ExtractedValue = input.ToUpper().Replace(" ", "_")
+            ExtractedValue = values
         };
+    }
+
+    private async Task<TraitParseResult?> ParseEnumListWithLLMAsync(string input, string parseHint)
+    {
+        try
+        {
+            var systemPrompt = @"You are a parser that extracts multiple structured values from user input.
+Your task: Parse the user's natural language input and map it to a list of expected enum values.
+
+Rules:
+- Return ONLY a comma-separated list of enum values (uppercase, snake_case)
+- If multiple values are mentioned, include them all
+- If the input doesn't clearly match any options, return 'UNKNOWN'
+- Do not add explanations or extra text";
+
+            var userPrompt = $@"Parse Hint: {parseHint}
+
+User Input: {input}
+
+Extract the enum list (comma-separated):";
+
+            _logger.LogDebug("Sending enum list parsing request to OpenAI");
+            var request = new OpenAICompletionRequest
+            {
+                SystemPrompt = systemPrompt,
+                UserPrompt = userPrompt,
+                MaxTokens = 150,
+                Temperature = 0.3f
+            };
+            var response = await _openAIService.GetCompletionAsync(request);
+            
+            if (!response.Success || string.IsNullOrWhiteSpace(response.Content))
+            {
+                _logger.LogWarning("OpenAI returned empty or failed response for enum list parsing: {Error}", response.ErrorMessage);
+                return null;
+            }
+
+            var extracted = response.Content.Trim();
+            _logger.LogInformation("OpenAI extracted enum list: '{Extracted}'", extracted);
+
+            if (extracted.Equals("UNKNOWN", StringComparison.OrdinalIgnoreCase))
+            {
+                return new TraitParseResult
+                {
+                    IsValid = false,
+                    ErrorReason = "Could not understand your selections."
+                };
+            }
+
+            // Parse the comma-separated response
+            var values = extracted.Split(',')
+                .Select(v => v.Trim())
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Distinct()
+                .ToList();
+
+            if (values.Count == 0)
+            {
+                return new TraitParseResult
+                {
+                    IsValid = false,
+                    ErrorReason = "No valid selections found."
+                };
+            }
+
+            return new TraitParseResult
+            {
+                IsValid = true,
+                ExtractedValue = values
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error using OpenAI for enum list parsing");
+            return null;
+        }
     }
 
     private string? TrySimpleEnumMatch(string input, string parseHint)

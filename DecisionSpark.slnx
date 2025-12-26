@@ -2,5 +2,9 @@
   <Folder Name="/Solution Items/">
     <File Path="DecisionSpark.http" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DecisionSpark.Playwright/DecisionSpark.Playwright.csproj" />
+    <Project Path="tests/DecisionSpark.Tests/DecisionSpark.Tests.csproj" />
+  </Folder>
   <Project Path="DecisionSpark/DecisionSpark.csproj" />
 </Solution>

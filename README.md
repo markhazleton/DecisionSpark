@@ -32,7 +32,7 @@ Initializes a decision session and returns the first question or final recommend
 {}
 ```
 
-**Response (needs info):**
+**Response (text question):**
 ```json
 {
   "texts": ["Let's figure out the best plan for Saturday."],
@@ -40,11 +40,70 @@ Initializes a decision session and returns the first question or final recommend
     "id": "group_size",
     "source": "FAMILY_SATURDAY_V1",
     "text": "How many people are going on the outing?",
-    "allow_free_text": true,
-    "is_free_text": true,
-    "type": "text"
+    "type": "text",
+    "allowFreeText": true,
+    "isFreeText": true,
+    "allowMultiSelect": false,
+    "isMultiSelect": false,
+    "options": [],
+    "metadata": {
+      "llmReasoning": "Free-text question for trait 'group_size' of type 'integer'",
+      "confidence": 0.9,
+      "allowFreeText": true,
+      "validationHints": []
+    }
   },
-  "next_url": "https://api.example.com/v2/pub/conversation/abc123/next"
+  "next_url": "https://api.example.com/conversation/abc123/next"
+}
+```
+
+**Response (single-select question with options):**
+```json
+{
+  "texts": ["Thanks! One quick question."],
+  "question": {
+    "id": "activity_preference",
+    "source": "FAMILY_SATURDAY_V1",
+    "text": "What type of activity would you prefer?",
+    "type": "single-select",
+    "allowFreeText": true,
+    "isFreeText": false,
+    "allowMultiSelect": false,
+    "isMultiSelect": false,
+    "options": [
+      {
+        "id": "indoor-sports",
+        "label": "Indoor sports",
+        "value": "indoor-sports",
+        "isNegative": false,
+        "isDefault": false,
+        "confidence": 0.9
+      },
+      {
+        "id": "outdoor-activities",
+        "label": "Outdoor activities",
+        "value": "outdoor-activities",
+        "isNegative": false,
+        "isDefault": false,
+        "confidence": 0.9
+      },
+      {
+        "id": "none-of-the-above",
+        "label": "None of the above",
+        "value": "none",
+        "isNegative": true,
+        "isDefault": false,
+        "confidence": 0.85
+      }
+    ],
+    "metadata": {
+      "llmReasoning": "Single selection required per trait configuration",
+      "confidence": 0.9,
+      "allowFreeText": true,
+      "validationHints": []
+    }
+  },
+  "next_url": "https://api.example.com/conversation/abc123/next"
 }
 ```
 
@@ -68,15 +127,31 @@ Initializes a decision session and returns the first question or final recommend
 #### `POST /v2/pub/conversation/{sessionId}/next`
 Continues the conversation with user's answer.
 
-**Request:**
+**Request (free text):**
 ```json
 {
   "user_input": "5 people: ages 4, 9, 38, 40, 12"
 }
 ```
 
+**Request (structured selection):**
+```json
+{
+  "selected_option_ids": ["indoor-sports"],
+  "user_input": "My custom answer"
+}
+```
+
+**Request (multi-select with negative option override):**
+```json
+{
+  "selected_option_ids": ["option-fever", "option-cough", "none-of-the-above"]
+}
+```
+Note: When `none-of-the-above` (negative option) is detected, only that option is stored per FR-006.
+
 **Response (next question or completion):**
-Same shape as Start response, plus optional `prev_url`.
+Same shape as Start response, plus optional `prev_url` and `error` for validation failures.
 
 ### Configuration
 
@@ -225,10 +300,14 @@ curl -X POST https://localhost:5001/v2/pub/conversation/{sessionId}/next \
 
 ## Future Enhancements
 
-- [ ] OpenAI question phrasing (currently stub)
+- [X] Multi-select option support with negative option handling
+- [X] Structured option selection with deterministic IDs
+- [X] Question type arbitration (text/single-select/multi-select)
+- [X] Validation history and retry logic with third-attempt fallback
+- [X] Telemetry tracking for renderer selection and latency
+- [ ] OpenAI question phrasing enhancement
 - [ ] LLM answer validation for complex traits
-- [ ] LLM clarifier for tie resolution
-- [ ] Multi-select option support
+- [ ] LLM clarifier for tie resolution (framework exists)
 - [ ] Session expiration and cleanup
 - [ ] Redis session persistence
 - [ ] Analytics event publishing

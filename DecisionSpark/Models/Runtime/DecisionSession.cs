@@ -13,4 +13,17 @@ public class DecisionSession
     public int ClarifierAttempts { get; set; }
     public string? PendingClarifierTraitKey { get; set; }
     public int RetryAttempt { get; set; }
+    public List<ValidationHistoryEntry> ValidationHistory { get; set; } = new();
+}
+
+/// <summary>
+/// Records a validation failure for analytics and retry logic.
+/// </summary>
+public class ValidationHistoryEntry
+{
+    public string TraitKey { get; set; } = string.Empty;
+    public int Attempt { get; set; }
+    public string InputTypeUsed { get; set; } = string.Empty;
+    public string ErrorReason { get; set; } = string.Empty;
+    public DateTime TimestampUtc { get; set; } = DateTime.UtcNow;
 }

@@ -7,11 +7,17 @@ using System.Reflection;
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure Serilog - using bootstrap logger pattern for better startup logging
+var logDirectory = builder.Configuration["Serilog:LogDirectory"] ?? "logs";
+var logPath = Path.Combine(logDirectory, "decisionspark-.txt");
+
+// Ensure log directory exists
+Directory.CreateDirectory(logDirectory);
+
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
     .WriteTo.Console()
-    .WriteTo.File("logs/decisionspark-.txt", rollingInterval: RollingInterval.Day)
+    .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
     .CreateLogger();
 
 try
@@ -83,6 +89,12 @@ try
     builder.Services.AddSingleton<IRoutingEvaluator, RoutingEvaluator>();
     builder.Services.AddSingleton<IResponseMapper, ResponseMapper>();
     builder.Services.AddSingleton<ITraitParser, TraitParser>();
+    
+    // Register new services for question type feature
+    builder.Services.AddSingleton<IOptionIdGenerator, OptionIdGenerator>();
+    builder.Services.AddSingleton<IQuestionPresentationDecider, QuestionPresentationDecider>();
+    builder.Services.AddScoped<IUserSelectionService, UserSelectionService>();
+    builder.Services.AddSingleton<IConversationPersistence, FileConversationPersistence>();
 
     // Register question generator - use OpenAI version if available, fallback to stub
     var useOpenAI = builder.Configuration.GetValue<bool>("OpenAI:EnableFallback", true);

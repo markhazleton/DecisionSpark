@@ -1,0 +1,45 @@
+@model DecisionSpark.ViewModels.Question.QuestionViewModel
+
+<div class="question-container text-question" data-question-id="@Model.Id">
+    <div class="question-prompt">
+        <p>@Model.Prompt</p>
+        @if (Model.RetryAttempt.HasValue && Model.RetryAttempt > 0)
+        {
+            <div class="alert alert-warning" role="alert">
+                <strong>Let me try again.</strong> Please check your input format.
+                @if (Model.Metadata?.ValidationHints.Any() == true)
+                {
+                    <ul class="mb-0 mt-2">
+                        @foreach (var hint in Model.Metadata.ValidationHints.Take(3))
+                        {
+                            <li>@hint</li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="question-input">
+        <div class="form-group">
+            <label for="text-input-@Model.Id" class="sr-only">Your answer</label>
+            <input 
+                type="text" 
+                id="text-input-@Model.Id" 
+                name="user_input" 
+                class="form-control" 
+                placeholder="Type your answer here..."
+                aria-label="Text input for @Model.Prompt"
+                aria-describedby="@(Model.RetryAttempt.HasValue ? "retry-hint-" + Model.Id : "")"
+                required
+            />
+        </div>
+        
+        <button 
+            type="submit" 
+            class="btn btn-primary mt-3"
+            aria-label="Submit answer">
+            Continue
+        </button>
+    </div>
+</div>
