@@ -1,9 +1,9 @@
-using DecisionSpark.Models.Api;
-using DecisionSpark.Models.Runtime;
-using DecisionSpark.Models.Spec;
+using DecisionSpark.Core.Models.Api;
+using DecisionSpark.Core.Models.Runtime;
+using DecisionSpark.Core.Models.Spec;
 using Microsoft.AspNetCore.Http;
 
-namespace DecisionSpark.Services;
+namespace DecisionSpark.Core.Services;
 
 public interface IResponseMapper
 {

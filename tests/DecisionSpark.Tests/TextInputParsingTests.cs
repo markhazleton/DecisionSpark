@@ -1,4 +1,4 @@
-using DecisionSpark.Services;
+using DecisionSpark.Core.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -104,12 +104,12 @@ public class TextInputParsingTests
     {
         // Arrange
         var input = "5";
-        var session = new Models.Runtime.DecisionSession
+        var session = new DecisionSpark.Core.Models.Runtime.DecisionSession
         {
             SessionId = "test123",
-            ValidationHistory = new List<Models.Runtime.ValidationHistoryEntry>
+            ValidationHistory = new List<DecisionSpark.Core.Models.Runtime.ValidationHistoryEntry>
             {
-                new Models.Runtime.ValidationHistoryEntry
+                new DecisionSpark.Core.Models.Runtime.ValidationHistoryEntry
                 {
                     TraitKey = "test_trait",
                     Attempt = 1,

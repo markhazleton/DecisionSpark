@@ -1,4 +1,4 @@
-using DecisionSpark.Models.Api;
+using DecisionSpark.Core.Models.Api;
 
 namespace DecisionSpark.ViewModels.Question;
 

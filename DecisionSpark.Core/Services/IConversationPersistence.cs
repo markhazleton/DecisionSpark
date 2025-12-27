@@ -1,6 +1,6 @@
-using DecisionSpark.Models.Runtime;
+using DecisionSpark.Core.Models.Runtime;
 
-namespace DecisionSpark.Services;
+namespace DecisionSpark.Core.Services;
 
 /// <summary>
 /// Persists conversation state to disk as JSON files

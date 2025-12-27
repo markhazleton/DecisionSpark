@@ -1,7 +1,7 @@
-using DecisionSpark.Models.Spec;
+using DecisionSpark.Core.Models.Spec;
 using System.Text.Json;
 
-namespace DecisionSpark.Services;
+namespace DecisionSpark.Core.Services;
 
 /// <summary>
 /// OpenAI-powered question generator that creates contextual, rephrased questions

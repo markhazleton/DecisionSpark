@@ -1,5 +1,5 @@
 using DecisionSpark.Middleware;
-using DecisionSpark.Services;
+using DecisionSpark.Core.Services;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Reflection;
@@ -16,9 +16,13 @@ Directory.CreateDirectory(logDirectory);
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
-    .WriteTo.Console()
+    .WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Error)
     .WriteTo.File(logPath, rollingInterval: RollingInterval.Day)
     .CreateLogger();
+
+// Clear default providers to prevent duplication
+builder.Logging.ClearProviders();
+builder.Logging.AddSerilog(Log.Logger);
 
 try
 {

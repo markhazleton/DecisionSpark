@@ -1,7 +1,7 @@
-using DecisionSpark.Models.Runtime;
-using DecisionSpark.Models.Spec;
+using DecisionSpark.Core.Models.Runtime;
+using DecisionSpark.Core.Models.Spec;
 
-namespace DecisionSpark.Services;
+namespace DecisionSpark.Core.Services;
 
 /// <summary>
 /// Determines which question presentation type (text, single-select, multi-select)

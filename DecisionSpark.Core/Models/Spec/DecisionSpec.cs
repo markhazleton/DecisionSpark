@@ -1,4 +1,4 @@
-namespace DecisionSpark.Models.Spec;
+namespace DecisionSpark.Core.Models.Spec;
 
 public class DecisionSpec
 {

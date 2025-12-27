@@ -1,4 +1,4 @@
-using DecisionSpark.Models.Api;
+using DecisionSpark.Core.Models.Api;
 using System.Text.Json;
 using Xunit;
 using FluentAssertions;

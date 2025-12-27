@@ -1,4 +1,4 @@
-namespace DecisionSpark.Services;
+namespace DecisionSpark.Core.Services;
 
 public class TraitParseResult
 {

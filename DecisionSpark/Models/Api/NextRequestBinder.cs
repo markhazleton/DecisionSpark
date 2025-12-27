@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
+using DecisionSpark.Core.Models.Api;
 
 namespace DecisionSpark.Models.Api;
 

@@ -1,4 +1,4 @@
-namespace DecisionSpark.Models.Api;
+namespace DecisionSpark.Core.Models.Api;
 
 public class StartResponse
 {

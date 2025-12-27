@@ -5,5 +5,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/DecisionSpark.Tests/DecisionSpark.Tests.csproj" />
   </Folder>
+  <Project Path="DecisionSpark.Core/DecisionSpark.Core.csproj" />
   <Project Path="DecisionSpark/DecisionSpark.csproj" />
 </Solution>

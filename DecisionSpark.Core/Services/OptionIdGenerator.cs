@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace DecisionSpark.Services;
+namespace DecisionSpark.Core.Services;
 
 /// <summary>
 /// Generates stable, deterministic option IDs from labels.

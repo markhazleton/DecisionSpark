@@ -1,4 +1,4 @@
-namespace DecisionSpark.Common;
+namespace DecisionSpark.Core.Common;
 
 /// <summary>
 /// Application-wide constants

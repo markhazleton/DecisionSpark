@@ -1,7 +1,7 @@
-using DecisionSpark.Models.Api;
-using DecisionSpark.Models.Spec;
+using DecisionSpark.Core.Models.Api;
+using DecisionSpark.Core.Models.Spec;
 
-namespace DecisionSpark.Services;
+namespace DecisionSpark.Core.Services;
 
 public interface IQuestionGenerator
 {

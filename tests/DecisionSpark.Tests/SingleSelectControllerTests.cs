@@ -1,4 +1,4 @@
-using DecisionSpark.Services;
+using DecisionSpark.Core.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;

@@ -1,4 +1,4 @@
-using DecisionSpark.Common;
+using DecisionSpark.Core.Common;
 
 namespace DecisionSpark.Middleware;
 

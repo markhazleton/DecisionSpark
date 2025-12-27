@@ -1,8 +1,8 @@
-using DecisionSpark.Models.Runtime;
-using DecisionSpark.Models.Spec;
+using DecisionSpark.Core.Models.Runtime;
+using DecisionSpark.Core.Models.Spec;
 using System.Text;
 
-namespace DecisionSpark.Services;
+namespace DecisionSpark.Core.Services;
 
 public interface IRoutingEvaluator
 {

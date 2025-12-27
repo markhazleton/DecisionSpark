@@ -1,5 +1,5 @@
-using DecisionSpark.Models.Api;
-using DecisionSpark.Services;
+using DecisionSpark.Core.Models.Api;
+using DecisionSpark.Core.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;

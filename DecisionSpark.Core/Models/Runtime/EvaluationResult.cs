@@ -1,6 +1,6 @@
-using DecisionSpark.Models.Spec;
+using DecisionSpark.Core.Models.Spec;
 
-namespace DecisionSpark.Models.Runtime;
+namespace DecisionSpark.Core.Models.Runtime;
 
 public class EvaluationResult
 {

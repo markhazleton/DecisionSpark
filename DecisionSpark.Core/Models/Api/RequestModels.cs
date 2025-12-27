@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace DecisionSpark.Models.Api;
+namespace DecisionSpark.Core.Models.Api;
 
 public class StartRequest
 {

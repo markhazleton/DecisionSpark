@@ -1,7 +1,7 @@
-using DecisionSpark.Models.Api;
-using DecisionSpark.Models.Runtime;
+using DecisionSpark.Core.Models.Api;
+using DecisionSpark.Core.Models.Runtime;
 
-namespace DecisionSpark.Services;
+namespace DecisionSpark.Core.Services;
 
 /// <summary>
 /// Processes and normalizes user selections from structured options or free text.

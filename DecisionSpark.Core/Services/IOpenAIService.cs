@@ -1,4 +1,4 @@
-namespace DecisionSpark.Services;
+namespace DecisionSpark.Core.Services;
 
 /// <summary>
 /// Configuration for OpenAI service

@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\DecisionSpark\DecisionSpark.csproj" />
+    <ProjectReference Include="..\..\DecisionSpark.Core\DecisionSpark.Core.csproj" />
   </ItemGroup>
 
 </Project>

@@ -2,7 +2,7 @@ using Azure;
 using Azure.AI.OpenAI;
 using OpenAI.Chat;
 
-namespace DecisionSpark.Services;
+namespace DecisionSpark.Core.Services;
 
 /// <summary>
 /// Implementation of OpenAI service supporting both OpenAI and Azure OpenAI

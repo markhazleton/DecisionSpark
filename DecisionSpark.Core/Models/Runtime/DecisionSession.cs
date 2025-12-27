@@ -1,4 +1,4 @@
-namespace DecisionSpark.Models.Runtime;
+namespace DecisionSpark.Core.Models.Runtime;
 
 public class DecisionSession
 {

@@ -1,8 +1,9 @@
-using DecisionSpark.Common;
+using DecisionSpark.Core.Common;
+using DecisionSpark.Core.Models.Api;
 using DecisionSpark.Models.Api;
-using DecisionSpark.Models.Runtime;
-using DecisionSpark.Models.Spec;
-using DecisionSpark.Services;
+using DecisionSpark.Core.Models.Runtime;
+using DecisionSpark.Core.Models.Spec;
+using DecisionSpark.Core.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DecisionSpark.Controllers;
@@ -318,7 +319,7 @@ public class ConversationController : ControllerBase
 
                 // Track validation failure
                 session.RetryAttempt++;
-                session.ValidationHistory.Add(new Models.Runtime.ValidationHistoryEntry
+                session.ValidationHistory.Add(new ValidationHistoryEntry
                 {
                     TraitKey = awaitingTraitKey,
                     Attempt = session.RetryAttempt,
