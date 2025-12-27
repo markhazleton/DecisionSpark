@@ -143,6 +143,12 @@ public class QuestionViewModel
 
     [StringLength(500, ErrorMessage = "Comment cannot exceed 500 characters")]
     public string? Comment { get; set; }
+
+    /// <summary>
+    /// Mapping for pseudo-trait tie-breaking logic.
+    /// JSON format: Dictionary<string, List<string>> mapping outcome IDs to option lists.
+    /// </summary>
+    public Dictionary<string, List<string>>? Mapping { get; set; }
 }
 
 /// <summary>

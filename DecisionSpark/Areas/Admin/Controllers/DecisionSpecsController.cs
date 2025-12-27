@@ -1,4 +1,5 @@
 using DecisionSpark.Areas.Admin.ViewModels.DecisionSpecs;
+using DecisionSpark.Core.Models.Spec;
 using DecisionSpark.Core.Persistence.Repositories;
 using DecisionSpark.Core.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -56,7 +57,7 @@ public class DecisionSpecsController : Controller
                         Owner = s.Owner,
                         Version = s.Version,
                         UpdatedAt = s.UpdatedAt,
-                        QuestionCount = s.QuestionCount,
+                        QuestionCount = s.TraitCount,
                         HasUnverifiedDraft = s.HasUnverifiedDraft
                     })
                     .ToList(),
@@ -133,31 +134,32 @@ public class DecisionSpecsController : Controller
                     Description = doc.Metadata.Description,
                     Tags = doc.Metadata.Tags?.ToList() ?? new List<string>()
                 },
-                Questions = doc.Questions.Select(q => new QuestionViewModel
+                Questions = doc.Traits.Select(t => new QuestionViewModel
                 {
-                    QuestionId = q.QuestionId,
-                    Type = q.Type,
-                    Prompt = q.Prompt,
-                    HelpText = q.HelpText,
-                    ParseHint = q.ParseHint,
-                    Required = q.Required,
-                    IsPseudoTrait = q.IsPseudoTrait,
-                    AllowMultiple = q.AllowMultiple,
-                    DependsOn = q.DependsOn?.ToList() ?? new List<string>(),
-                    Comment = q.Comment,
-                    Bounds = q.Bounds != null ? new QuestionBoundsViewModel 
+                    QuestionId = t.Key,
+                    Type = t.AnswerType,
+                    Prompt = t.QuestionText,
+                    HelpText = "",
+                    ParseHint = t.ParseHint,
+                    Required = t.Required,
+                    IsPseudoTrait = t.IsPseudoTrait,
+                    AllowMultiple = t.AllowMultiple ?? false,
+                    DependsOn = t.DependsOn?.ToList() ?? new List<string>(),
+                    Comment = t.Comment,
+                    Bounds = t.Bounds != null ? new QuestionBoundsViewModel
                     { 
-                        Min = q.Bounds.Min, 
-                        Max = q.Bounds.Max 
+                        Min = t.Bounds.Min, 
+                        Max = t.Bounds.Max 
                     } : null,
-                    Options = q.Options.Select(o => new OptionViewModel
+                    Options = (t.Options ?? new List<string>()).Select((o, idx) => new OptionViewModel
                     {
-                        OptionId = o.OptionId,
-                        Label = o.Label,
-                        Value = o.Value,
-                        NextQuestionId = o.NextQuestionId
+                        OptionId = $"opt{idx}",
+                        Label = o,
+                        Value = o,
+                        NextQuestionId = null
                     }).ToList(),
-                    Validation = q.Validation
+                    Validation = null,
+                    Mapping = t.Mapping
                 }).ToList(),
                 DerivedTraits = doc.DerivedTraits?.Select(dt => new DerivedTraitViewModel
                 {
@@ -181,7 +183,7 @@ public class DecisionSpecsController : Controller
                         GroupId = dc.GroupId,
                         CareTypeMessage = dc.CareTypeMessage,
                         IconUrl = dc.IconUrl,
-                        Description = dc.Description,
+                        Description = string.Join(". ", dc.BodyText ?? new List<string>()),
                         BodyText = dc.BodyText?.ToList() ?? new List<string>(),
                         CareTypeDetails = dc.CareTypeDetails?.ToList() ?? new List<string>(),
                         Rules = dc.Rules?.ToList() ?? new List<string>()
@@ -199,19 +201,19 @@ public class DecisionSpecsController : Controller
                     ClarifierMaxAttempts = doc.TieStrategy.ClarifierMaxAttempts,
                     PseudoTraits = doc.TieStrategy.PseudoTraits?.Select(pt => new QuestionViewModel
                     {
-                        QuestionId = pt.QuestionId,
-                        Type = pt.Type,
-                        Prompt = pt.Prompt,
-                        HelpText = pt.HelpText,
+                        QuestionId = pt.Key,
+                        Type = pt.AnswerType,
+                        Prompt = pt.QuestionText,
+                        HelpText = "",
                         ParseHint = pt.ParseHint,
                         Required = pt.Required,
                         IsPseudoTrait = pt.IsPseudoTrait,
-                        Options = pt.Options?.Select(o => new OptionViewModel
+                        Options = (pt.Options ?? new List<string>()).Select((o, idx) => new OptionViewModel
                         {
-                            OptionId = o.OptionId,
-                            Label = o.Label,
-                            Value = o.Value
-                        }).ToList() ?? new List<OptionViewModel>()
+                            OptionId = $"opt{idx}",
+                            Label = o,
+                            Value = o
+                        }).ToList()
                     }).ToList() ?? new List<QuestionViewModel>(),
                     LlmPromptTemplate = doc.TieStrategy.LlmPromptTemplate
                 } : null,
@@ -390,7 +392,7 @@ public class DecisionSpecsController : Controller
                     Description = doc.Metadata.Description,
                     Tags = doc.Metadata.Tags?.ToList() ?? new List<string>()
                 },
-                QuestionCount = doc.Questions.Count,
+                QuestionCount = doc.Traits.Count,
                 OutcomeCount = doc.Outcomes.Count,
                 CreatedAt = doc.Metadata.CreatedAt,
                 UpdatedAt = doc.Metadata.UpdatedAt,
@@ -602,60 +604,54 @@ public class DecisionSpecsController : Controller
                 Description = viewModel.Metadata.Description,
                 Tags = viewModel.Metadata.Tags
             },
-            Questions = viewModel.Questions.Select(q => new DecisionSpark.Core.Models.Spec.Question
+            Traits = viewModel.Questions.Select(q => new TraitDefinition
             {
-                QuestionId = q.QuestionId,
-                Type = q.Type,
-                Prompt = q.Prompt,
-                HelpText = q.HelpText,
-                ParseHint = q.ParseHint,
+                Key = q.QuestionId,
+                AnswerType = q.Type,
+                QuestionText = q.Prompt,
+                ParseHint = q.ParseHint ?? string.Empty,
                 Required = q.Required,
                 IsPseudoTrait = q.IsPseudoTrait,
                 AllowMultiple = q.AllowMultiple,
                 DependsOn = q.DependsOn,
                 Comment = q.Comment,
-                Bounds = q.Bounds != null ? new DecisionSpark.Core.Models.Spec.QuestionBounds 
+                Bounds = q.Bounds != null ? new TraitBounds
                 { 
-                    Min = q.Bounds.Min, 
-                    Max = q.Bounds.Max 
+                    Min = q.Bounds.Min ?? 0, 
+                    Max = q.Bounds.Max ?? int.MaxValue 
                 } : null,
-                Options = q.Options.Select(o => new DecisionSpark.Core.Models.Spec.Option
-                {
-                    OptionId = o.OptionId,
-                    Label = o.Label,
-                    Value = o.Value,
-                    NextQuestionId = o.NextQuestionId
-                }).ToList(),
-                Validation = q.Validation
+                Options = q.Options.Select(o => o.Value).ToList(),
+                Mapping = q.Mapping
             }).ToList(),
-            DerivedTraits = viewModel.DerivedTraits.Select(dt => new DecisionSpark.Core.Models.Spec.DerivedTrait
+            DerivedTraits = viewModel.DerivedTraits.Select(dt => new DerivedTraitDefinition
             {
                 Key = dt.Key,
                 Expression = dt.Expression
             }).ToList(),
-            ImmediateSelectIf = viewModel.ImmediateSelectRules.Select(isr => new DecisionSpark.Core.Models.Spec.ImmediateSelectRule
+            ImmediateSelectIf = viewModel.ImmediateSelectRules.Select(isr => new ImmediateSelectRule
             {
                 OutcomeId = isr.OutcomeId,
                 Rule = isr.Rule
             }).ToList(),
-            Outcomes = viewModel.Outcomes.Select(o => new DecisionSpark.Core.Models.Spec.Outcome
+            Outcomes = viewModel.Outcomes.Select(o => new OutcomeDefinition
             {
                 OutcomeId = o.OutcomeId,
                 SelectionRules = o.SelectionRules,
                 CareTypeMessage = o.CareTypeMessage,
-                DisplayCards = o.DisplayCards.Select(dc => new DecisionSpark.Core.Models.Spec.OutcomeDisplayCard
+                DisplayCards = o.DisplayCards.Select(dc => new DisplayCard
                 {
                     Title = dc.Title,
                     Subtitle = dc.Subtitle,
                     GroupId = dc.GroupId,
                     CareTypeMessage = dc.CareTypeMessage,
                     IconUrl = dc.IconUrl,
-                    Description = dc.Description,
-                    BodyText = dc.BodyText,
+                    BodyText = string.IsNullOrWhiteSpace(dc.Description) 
+                        ? dc.BodyText 
+                        : new List<string> { dc.Description },
                     CareTypeDetails = dc.CareTypeDetails,
                     Rules = dc.Rules
                 }).ToList(),
-                FinalResult = o.FinalResult != null ? new DecisionSpark.Core.Models.Spec.OutcomeFinalResult
+                FinalResult = o.FinalResult != null ? new FinalResultDefinition
                 {
                     ResolutionButtonLabel = o.FinalResult.ResolutionButtonLabel,
                     ResolutionButtonUrl = o.FinalResult.ResolutionButtonUrl,
@@ -666,21 +662,15 @@ public class DecisionSpecsController : Controller
             {
                 Mode = viewModel.TieStrategy.Mode,
                 ClarifierMaxAttempts = viewModel.TieStrategy.ClarifierMaxAttempts,
-                PseudoTraits = viewModel.TieStrategy.PseudoTraits.Select(pt => new DecisionSpark.Core.Models.Spec.Question
+                PseudoTraits = viewModel.TieStrategy.PseudoTraits.Select(pt => new TraitDefinition
                 {
-                    QuestionId = pt.QuestionId,
-                    Type = pt.Type,
-                    Prompt = pt.Prompt,
-                    HelpText = pt.HelpText,
-                    ParseHint = pt.ParseHint,
+                    Key = pt.QuestionId,
+                    AnswerType = pt.Type,
+                    QuestionText = pt.Prompt,
+                    ParseHint = pt.ParseHint ?? string.Empty,
                     Required = pt.Required,
                     IsPseudoTrait = pt.IsPseudoTrait,
-                    Options = pt.Options.Select(o => new DecisionSpark.Core.Models.Spec.Option
-                    {
-                        OptionId = o.OptionId,
-                        Label = o.Label,
-                        Value = o.Value
-                    }).ToList()
+                    Options = pt.Options.Select(o => o.Value).ToList()
                 }).ToList(),
                 LlmPromptTemplate = viewModel.TieStrategy.LlmPromptTemplate
             } : null,

@@ -76,8 +76,21 @@
                value="@Model.Comment" 
                class="form-control" 
                placeholder="Internal comment about this question" />
-        <small class="form-text text-muted">For documentation purposes</small>
+        <small class="form-text text-muted">For documentation purposes (max 500 characters)</small>
     </div>
+
+    @if (Model.IsPseudoTrait)
+    {
+        <div class="mb-3">
+            <label for="Questions_@(index)__Mapping" class="form-label">Mapping (JSON)</label>
+            <textarea name="Questions[@index].Mapping" 
+                      id="Questions_@(index)__Mapping"
+                      class="form-control font-monospace" 
+                      rows="3"
+                      placeholder='{"OUTCOME_A": ["option1", "option2"], "OUTCOME_B": ["option3"]}'>@(Model.Mapping != null ? System.Text.Json.JsonSerializer.Serialize(Model.Mapping) : "")</textarea>
+            <small class="form-text text-muted">Tie-breaking logic for pseudo-traits - maps outcome IDs to option lists (JSON format)</small>
+        </div>
+    }
 
     <div class="row g-3 mb-3">
         <div class="col-md-4">
