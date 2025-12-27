@@ -59,6 +59,12 @@ public class DecisionSpecEditViewModel
 
     public string Status { get; set; } = "Draft";
 
+    [Url(ErrorMessage = "Canonical Base URL must be a valid URL")]
+    public string? CanonicalBaseUrl { get; set; }
+
+    [StringLength(2000, ErrorMessage = "Safety preamble cannot exceed 2000 characters")]
+    public string? SafetyPreamble { get; set; }
+
     /// <summary>
     /// ETag for optimistic concurrency control. Empty for new specs.
     /// </summary>
@@ -79,6 +85,11 @@ public class DecisionSpecEditViewModel
     [Required(ErrorMessage = "At least one outcome is required")]
     [MinLength(1, ErrorMessage = "At least one outcome is required")]
     public List<OutcomeViewModel> Outcomes { get; set; } = new();
+
+    public List<DerivedTraitViewModel> DerivedTraits { get; set; } = new();
+    public List<ImmediateSelectRuleViewModel> ImmediateSelectRules { get; set; } = new();
+    public TieStrategyViewModel? TieStrategy { get; set; }
+    public DisambiguationViewModel? Disambiguation { get; set; }
 
     public bool IsNewSpec => string.IsNullOrWhiteSpace(ETag);
 }
@@ -117,11 +128,21 @@ public class QuestionViewModel
     [StringLength(1000, ErrorMessage = "Help text cannot exceed 1000 characters")]
     public string? HelpText { get; set; }
 
-    public bool Required { get; set; } = true;
+    [StringLength(2000, ErrorMessage = "Parse hint cannot exceed 2000 characters")]
+    public string? ParseHint { get; set; }
 
+    public bool Required { get; set; } = true;
+    public bool IsPseudoTrait { get; set; } = false;
+    public bool AllowMultiple { get; set; } = false;
+
+    public List<string> DependsOn { get; set; } = new();
     public List<OptionViewModel> Options { get; set; } = new();
 
     public Dictionary<string, object>? Validation { get; set; }
+    public QuestionBoundsViewModel? Bounds { get; set; }
+
+    [StringLength(500, ErrorMessage = "Comment cannot exceed 500 characters")]
+    public string? Comment { get; set; }
 }
 
 /// <summary>
@@ -152,7 +173,11 @@ public class OutcomeViewModel
 
     public List<string> SelectionRules { get; set; } = new();
 
+    [StringLength(1000, ErrorMessage = "Care type message cannot exceed 1000 characters")]
+    public string? CareTypeMessage { get; set; }
+
     public List<OutcomeDisplayCardViewModel> DisplayCards { get; set; } = new();
+    public OutcomeFinalResultViewModel? FinalResult { get; set; }
 }
 
 /// <summary>
@@ -164,8 +189,98 @@ public class OutcomeDisplayCardViewModel
     [StringLength(200, ErrorMessage = "Title cannot exceed 200 characters")]
     public string Title { get; set; } = string.Empty;
 
+    [StringLength(200, ErrorMessage = "Subtitle cannot exceed 200 characters")]
+    public string? Subtitle { get; set; }
+
+    public string? GroupId { get; set; }
+
+    [StringLength(1000, ErrorMessage = "Care type message cannot exceed 1000 characters")]
+    public string? CareTypeMessage { get; set; }
+
+    [Url(ErrorMessage = "Icon URL must be a valid URL")]
+    public string? IconUrl { get; set; }
+
     [StringLength(1000, ErrorMessage = "Description cannot exceed 1000 characters")]
     public string Description { get; set; } = string.Empty;
+
+    public List<string> BodyText { get; set; } = new();
+    public List<string> CareTypeDetails { get; set; } = new();
+    public List<string> Rules { get; set; } = new();
+}
+
+/// <summary>
+/// View model for question bounds
+/// </summary>
+public class QuestionBoundsViewModel
+{
+    public int? Min { get; set; }
+    public int? Max { get; set; }
+}
+
+/// <summary>
+/// View model for derived traits
+/// </summary>
+public class DerivedTraitViewModel
+{
+    [Required(ErrorMessage = "Trait key is required")]
+    public string Key { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Expression is required")]
+    [StringLength(1000, ErrorMessage = "Expression cannot exceed 1000 characters")]
+    public string Expression { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// View model for immediate select rules
+/// </summary>
+public class ImmediateSelectRuleViewModel
+{
+    [Required(ErrorMessage = "Outcome ID is required")]
+    public string OutcomeId { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Rule is required")]
+    [StringLength(1000, ErrorMessage = "Rule cannot exceed 1000 characters")]
+    public string Rule { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// View model for tie strategy
+/// </summary>
+public class TieStrategyViewModel
+{
+    [Required(ErrorMessage = "Mode is required")]
+    public string Mode { get; set; } = "LLM_CLARIFIER";
+
+    [Range(1, 10, ErrorMessage = "Clarifier max attempts must be between 1 and 10")]
+    public int ClarifierMaxAttempts { get; set; } = 3;
+
+    public List<QuestionViewModel> PseudoTraits { get; set; } = new();
+
+    [StringLength(2000, ErrorMessage = "LLM prompt template cannot exceed 2000 characters")]
+    public string? LlmPromptTemplate { get; set; }
+}
+
+/// <summary>
+/// View model for disambiguation
+/// </summary>
+public class DisambiguationViewModel
+{
+    public List<string> FallbackTraitOrder { get; set; } = new();
+}
+
+/// <summary>
+/// View model for outcome final result
+/// </summary>
+public class OutcomeFinalResultViewModel
+{
+    [StringLength(200, ErrorMessage = "Resolution button label cannot exceed 200 characters")]
+    public string? ResolutionButtonLabel { get; set; }
+
+    [Url(ErrorMessage = "Resolution button URL must be a valid URL")]
+    public string? ResolutionButtonUrl { get; set; }
+
+    [StringLength(100, ErrorMessage = "Analytics resolution code cannot exceed 100 characters")]
+    public string? AnalyticsResolutionCode { get; set; }
 }
 
 /// <summary>

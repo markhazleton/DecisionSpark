@@ -1,75 +1,59 @@
+using System.Text.Json.Serialization;
+
 namespace DecisionSpark.Core.Models.Spec;
 
 /// <summary>
-/// Extended DecisionSpec document structure for CRUD operations.
-/// Contains questions and outcomes for simplified question-based decision trees.
+/// DecisionSpec document structure for CRUD operations.
+/// Uses IDENTICAL schema to runtime DecisionSpec - just inherits from it.
+/// Lifecycle metadata stored separately in sidecar files.
 /// </summary>
-public class DecisionSpecDocument
+public class DecisionSpecDocument : DecisionSpec
 {
-    public string SpecId { get; set; } = string.Empty;
-    public string Version { get; set; } = "1.0.0";
+    // Lifecycle properties NOT part of runtime schema
+    // These are populated from sidecar metadata files
     public string Status { get; set; } = "Draft";
-    public DecisionSpecMetadata Metadata { get; set; } = new();
-    public List<Question> Questions { get; set; } = new();
-    public List<Outcome> Outcomes { get; set; } = new();
+    public DecisionSpecMetadata? Metadata { get; set; }
 }
 
 /// <summary>
-/// Metadata for DecisionSpec management and lifecycle.
+/// Lifecycle metadata for DecisionSpec management (stored separately in sidecar file).
+/// NOT part of runtime schema.
 /// </summary>
 public class DecisionSpecMetadata
 {
+    [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
+    
+    [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;
+    
+    [JsonPropertyName("owner")]
     public string Owner { get; set; } = string.Empty;
+    
+    [JsonPropertyName("tags")]
     public List<string> Tags { get; set; } = new();
+    
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = "Draft";
+    
+    [JsonPropertyName("unverified")]
     public bool Unverified { get; set; } = false;
+    
+    [JsonPropertyName("created_at")]
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    
+    [JsonPropertyName("updated_at")]
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+    
+    [JsonPropertyName("created_by")]
     public string CreatedBy { get; set; } = string.Empty;
+    
+    [JsonPropertyName("updated_by")]
     public string UpdatedBy { get; set; } = string.Empty;
-}
-
-/// <summary>
-/// Question structure for new question-type feature (simpler than TraitDefinition).
-/// </summary>
-public class Question
-{
-    public string QuestionId { get; set; } = string.Empty;
-    public string Type { get; set; } = "SingleSelect";
-    public string Prompt { get; set; } = string.Empty;
-    public string? HelpText { get; set; }
-    public bool Required { get; set; } = true;
-    public List<Option> Options { get; set; } = new();
-    public Dictionary<string, object>? Validation { get; set; }
-}
-
-/// <summary>
-/// Option for a question.
-/// </summary>
-public class Option
-{
-    public string OptionId { get; set; } = string.Empty;
-    public string Label { get; set; } = string.Empty;
-    public string Value { get; set; } = string.Empty;
-    public string? NextQuestionId { get; set; }
-}
-
-/// <summary>
-/// Outcome with simplified question-based rules.
-/// </summary>
-public class Outcome
-{
-    public string OutcomeId { get; set; } = string.Empty;
-    public List<string> SelectionRules { get; set; } = new();
-    public List<OutcomeDisplayCard> DisplayCards { get; set; } = new();
-}
-
-/// <summary>
-/// Display card for outcomes (simpler version for question-type feature).
-/// </summary>
-public class OutcomeDisplayCard
-{
-    public string Title { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
+    
+    [JsonPropertyName("soft_deleted_at")]
+    public DateTimeOffset? SoftDeletedAt { get; set; }
+    
+    [JsonPropertyName("restorable_until")]
+    public DateTimeOffset? RestorableUntil { get; set; }
 }

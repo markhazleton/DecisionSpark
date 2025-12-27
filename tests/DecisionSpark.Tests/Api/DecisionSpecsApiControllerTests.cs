@@ -19,7 +19,7 @@ namespace DecisionSpark.Tests.Api;
 public class DecisionSpecsApiControllerTests
 {
     private readonly Mock<IDecisionSpecRepository> _mockRepository;
-    private readonly Mock<QuestionPatchService> _mockPatchService;
+    private readonly Mock<TraitPatchService> _mockPatchService;
     private readonly Mock<ILogger<DecisionSpecsApiController>> _mockLogger;
     private readonly DecisionSpecsApiController _controller;
 
@@ -28,9 +28,9 @@ public class DecisionSpecsApiControllerTests
         _mockRepository = new Mock<IDecisionSpecRepository>();
         _mockLogger = new Mock<ILogger<DecisionSpecsApiController>>();
         
-        // QuestionPatchService requires repository and logger
-        var patchServiceLogger = new Mock<ILogger<QuestionPatchService>>();
-        _mockPatchService = new Mock<QuestionPatchService>(_mockRepository.Object, patchServiceLogger.Object);
+        // TraitPatchService requires repository and logger
+        var patchServiceLogger = new Mock<ILogger<TraitPatchService>>();
+        _mockPatchService = new Mock<TraitPatchService>(_mockRepository.Object, patchServiceLogger.Object);
 
         _controller = new DecisionSpecsApiController(
             _mockRepository.Object,
@@ -52,8 +52,8 @@ public class DecisionSpecsApiControllerTests
         // Arrange
         var summaries = new List<DecisionSpecSummary>
         {
-            new() { SpecId = "spec1", Name = "Test Spec 1", Status = "Draft", Owner = "user1", QuestionCount = 3 },
-            new() { SpecId = "spec2", Name = "Test Spec 2", Status = "Published", Owner = "user2", QuestionCount = 5 }
+            new() { SpecId = "spec1", Name = "Test Spec 1", Status = "Draft", Owner = "user1", TraitCount = 3 },
+            new() { SpecId = "spec2", Name = "Test Spec 2", Status = "Published", Owner = "user2", TraitCount = 5 }
         };
         _mockRepository.Setup(r => r.ListAsync(null, null, null, default))
             .ReturnsAsync(summaries);
@@ -447,26 +447,26 @@ public class DecisionSpecsApiControllerTests
 
     #endregion
 
-    #region Patch Question Tests
+    #region Patch Trait Tests
 
     [Fact]
-    public async Task PatchQuestion_ReturnsOk_WhenSuccessful()
+    public async Task PatchTrait_ReturnsOk_WhenSuccessful()
     {
         // Arrange
-        var request = new QuestionPatchRequest
+        var request = new TraitPatchRequest
         {
-            Prompt = "Updated prompt",
-            HelpText = "Updated help text"
+            QuestionText = "Updated prompt",
+            Comment = "Updated help text"
         };
         var patchedDoc = CreateSampleDocument("test-spec", "1.0.0", "Draft");
         var newEtag = "new-etag";
 
-        _mockPatchService.Setup(s => s.PatchQuestionAsync(
-            "test-spec", "q1", "Updated prompt", "Updated help text", null, null, "old-etag", It.IsAny<string>(), default))
+        _mockPatchService.Setup(s => s.PatchTraitAsync(
+            "test-spec", "q1", "Updated prompt", null, null, null, "Updated help text", "old-etag", It.IsAny<string>(), default))
             .ReturnsAsync((patchedDoc, newEtag));
 
         // Act
-        var result = await _controller.PatchQuestion("test-spec", "q1", request, "old-etag");
+        var result = await _controller.PatchTrait("test-spec", "q1", request, "old-etag");
 
         // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
@@ -477,13 +477,13 @@ public class DecisionSpecsApiControllerTests
     }
 
     [Fact]
-    public async Task PatchQuestion_ReturnsBadRequest_WhenIfMatchMissing()
+    public async Task PatchTrait_ReturnsBadRequest_WhenIfMatchMissing()
     {
         // Arrange
-        var request = new QuestionPatchRequest { Prompt = "Updated prompt" };
+        var request = new TraitPatchRequest { QuestionText = "Updated prompt" };
 
         // Act
-        var result = await _controller.PatchQuestion("test-spec", "q1", request, "");
+        var result = await _controller.PatchTrait("test-spec", "q1", request, "");
 
         // Assert
         var badRequestResult = result.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
@@ -492,22 +492,22 @@ public class DecisionSpecsApiControllerTests
     }
 
     [Fact]
-    public async Task PatchQuestion_ReturnsNotFound_WhenQuestionDoesNotExist()
+    public async Task PatchTrait_ReturnsNotFound_WhenTraitDoesNotExist()
     {
         // Arrange
-        var request = new QuestionPatchRequest { Prompt = "Updated prompt" };
+        var request = new TraitPatchRequest { QuestionText = "Updated prompt" };
 
-        _mockPatchService.Setup(s => s.PatchQuestionAsync(
-            "test-spec", "nonexistent", It.IsAny<string>(), It.IsAny<string>(), null, null, "etag", It.IsAny<string>(), default))
+        _mockPatchService.Setup(s => s.PatchTraitAsync(
+            "test-spec", "nonexistent", It.IsAny<string>(), It.IsAny<string>(), null, null, It.IsAny<string>(), "etag", It.IsAny<string>(), default))
             .ThrowsAsync(new KeyNotFoundException());
 
         // Act
-        var result = await _controller.PatchQuestion("test-spec", "nonexistent", request, "etag");
+        var result = await _controller.PatchTrait("test-spec", "nonexistent", request, "etag");
 
-        // Assert
+        // Assert - Controller catches KeyNotFoundException and returns NotFoundObjectResult with validation details
         var notFoundResult = result.Result.Should().BeOfType<NotFoundObjectResult>().Subject;
         var problemDetails = notFoundResult.Value.Should().BeOfType<ValidationProblemDetails>().Subject;
-        problemDetails.Errors.Should().ContainKey("questionId");
+        problemDetails.Errors.Should().ContainKey("traitKey");
     }
 
     #endregion
@@ -527,17 +527,17 @@ public class DecisionSpecsApiControllerTests
                 Description = "A test specification",
                 Tags = new List<string> { "test" }
             },
-            Questions = new List<QuestionDto>
+            Traits = new List<TraitDto>
             {
                 new()
                 {
-                    QuestionId = "q1",
-                    Type = "SingleSelect",
-                    Prompt = "Test question?",
+                    Key = "q1",
+                    AnswerType = "SingleSelect",
+                    QuestionText = "Test question?",
                     Required = true,
                     Options = new List<OptionDto>
                     {
-                        new() { OptionId = "o1", Label = "Option 1", Value = "opt1" }
+                        new() { Key = "o1", Label = "Option 1", Value = "opt1" }
                     }
                 }
             },
@@ -566,17 +566,17 @@ public class DecisionSpecsApiControllerTests
                 Description = "A test specification",
                 Tags = new List<string> { "test" }
             },
-            Questions = new List<QuestionDto>
+            Traits = new List<TraitDto>
             {
                 new()
                 {
-                    QuestionId = "q1",
-                    Type = "SingleSelect",
-                    Prompt = "Test question?",
+                    Key = "q1",
+                    AnswerType = "SingleSelect",
+                    QuestionText = "Test question?",
                     Required = true,
                     Options = new List<OptionDto>
                     {
-                        new() { OptionId = "o1", Label = "Option 1", Value = "opt1" }
+                        new() { Key = "o1", Label = "Option 1", Value = "opt1" }
                     }
                 }
             },
@@ -605,27 +605,24 @@ public class DecisionSpecsApiControllerTests
                 Description = "A test specification",
                 Tags = new List<string> { "test" }
             },
-            Questions = new List<Question>
+            Traits = new List<TraitDefinition>
             {
                 new()
                 {
-                    QuestionId = "q1",
-                    Type = "SingleSelect",
-                    Prompt = "Test question?",
+                    Key = "q1",
+                    AnswerType = "SingleSelect",
+                    QuestionText = "Test question?",
                     Required = true,
-                    Options = new List<Option>
-                    {
-                        new() { OptionId = "o1", Label = "Option 1", Value = "opt1" }
-                    }
+                    Options = new List<string> { "Option 1" }
                 }
             },
-            Outcomes = new List<Outcome>
+            Outcomes = new List<OutcomeDefinition>
             {
                 new()
                 {
                     OutcomeId = "outcome1",
                     SelectionRules = new List<string> { "q1:opt1" },
-                    DisplayCards = new List<OutcomeDisplayCard>()
+                    DisplayCards = new List<DisplayCard>()
                 }
             }
         };

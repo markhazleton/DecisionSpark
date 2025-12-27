@@ -1,0 +1,127 @@
+@{
+    ViewData["Title"] = $"JSON - {ViewBag.SpecId}";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="@Url.Action("Index")">Decision Specs</a></li>
+                    <li class="breadcrumb-item"><a href="@Url.Action("Details", new { specId = ViewBag.SpecId })">@ViewBag.SpecId</a></li>
+                    <li class="breadcrumb-item active">View JSON</li>
+                </ol>
+            </nav>
+            <h1 class="h2">
+                <i class="bi bi-code-square"></i> JSON Document - @ViewBag.SpecId
+            </h1>
+            @if (!string.IsNullOrEmpty(ViewBag.Version))
+            {
+                <p class="text-muted">Version: @ViewBag.Version</p>
+            }
+        </div>
+        <div class="col-auto">
+            <button onclick="copyToClipboard()" class="btn btn-outline-primary me-2">
+                <i class="bi bi-clipboard"></i> Copy JSON
+            </button>
+            <button onclick="downloadJson()" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-download"></i> Download
+            </button>
+            <a href="@Url.Action("Details", new { specId = ViewBag.SpecId })" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Details
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Full DecisionSpec JSON</h5>
+                    <span class="badge bg-info">Read-Only</span>
+                </div>
+                <div class="card-body p-0">
+                    <pre id="jsonContent" class="m-0 p-3" style="max-height: 80vh; overflow-y: auto; background-color: #f8f9fa;"><code class="language-json">@Html.Raw(ViewBag.JsonContent)</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                <strong>Tip:</strong> This JSON represents the complete DecisionSpec document as it would be consumed by runtime services.
+                You can copy this to test external integrations or for backup purposes.
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    
+    <script>
+        // Initialize syntax highlighting
+        document.addEventListener('DOMContentLoaded', function() {
+            hljs.highlightAll();
+        });
+
+        // Copy JSON to clipboard
+        function copyToClipboard() {
+            const jsonContent = document.getElementById('jsonContent').textContent;
+            
+            navigator.clipboard.writeText(jsonContent).then(function() {
+                // Show success feedback
+                const btn = event.target.closest('button');
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="bi bi-check"></i> Copied!';
+                btn.classList.remove('btn-outline-primary');
+                btn.classList.add('btn-success');
+                
+                setTimeout(function() {
+                    btn.innerHTML = originalHtml;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-primary');
+                }, 2000);
+            }).catch(function(err) {
+                alert('Failed to copy to clipboard. Please try selecting and copying manually.');
+                console.error('Copy failed:', err);
+            });
+        }
+
+        // Download JSON as file
+        function downloadJson() {
+            const jsonContent = document.getElementById('jsonContent').textContent;
+            const specId = '@ViewBag.SpecId';
+            const version = '@ViewBag.Version' || 'latest';
+            const filename = `${specId}_${version}.json`;
+            
+            const blob = new Blob([jsonContent], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            // Show success feedback
+            const btn = event.target.closest('button');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check"></i> Downloaded!';
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-success');
+            
+            setTimeout(function() {
+                btn.innerHTML = originalHtml;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-secondary');
+            }, 2000);
+        }
+    </script>
+}

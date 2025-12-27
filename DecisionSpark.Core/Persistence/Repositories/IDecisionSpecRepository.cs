@@ -64,7 +64,7 @@ public class DecisionSpecSummary
     public string Owner { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
     public DateTimeOffset UpdatedAt { get; set; }
-    public int QuestionCount { get; set; }
+    public int TraitCount { get; set; }
     public bool HasUnverifiedDraft { get; set; }
     public string ETag { get; set; } = string.Empty;
 }

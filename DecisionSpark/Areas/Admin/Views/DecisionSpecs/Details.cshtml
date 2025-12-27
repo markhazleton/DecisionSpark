@@ -205,7 +205,7 @@
                     <a href="@Url.Action("Edit", new { specId = Model.SpecId })" class="btn btn-outline-primary w-100 mb-2">
                         <i class="bi bi-pencil"></i> Edit Spec
                     </a>
-                    <a href="/api/decisionspecs/@Model.SpecId/full" target="_blank" class="btn btn-outline-secondary w-100 mb-2">
+                    <a href="@Url.Action("ViewJson", new { specId = Model.SpecId })" class="btn btn-outline-secondary w-100 mb-2">
                         <i class="bi bi-code-square"></i> View JSON
                     </a>
                     <button type="button" class="btn btn-outline-info w-100" onclick="copySpecId()">

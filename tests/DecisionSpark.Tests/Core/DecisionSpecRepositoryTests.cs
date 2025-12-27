@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Xunit;
 using DecisionSpark.Core.Models.Configuration;
+using Moq;
 
 namespace DecisionSpark.Tests.Core;
 
@@ -39,14 +40,11 @@ public class DecisionSpecRepositoryTests : IDisposable
         var fileStoreLogger = new LoggerFactory().CreateLogger<DecisionSpecFileStore>();
         _fileStore = new DecisionSpecFileStore(options, fileStoreLogger);
 
-        var legacyAdapterLogger = new LoggerFactory().CreateLogger<LegacyDecisionSpecAdapter>();
-        var legacyAdapter = new LegacyDecisionSpecAdapter(legacyAdapterLogger);
-
         var indexerLogger = new LoggerFactory().CreateLogger<FileSearchIndexer>();
-        _indexer = new FileSearchIndexer(options, indexerLogger, _fileStore, legacyAdapter);
+        _indexer = new FileSearchIndexer(options, indexerLogger, _fileStore);
 
         var repositoryLogger = new LoggerFactory().CreateLogger<DecisionSpecRepository>();
-        _repository = new DecisionSpecRepository(_fileStore, _indexer, legacyAdapter, options, repositoryLogger);
+        _repository = new DecisionSpecRepository(_fileStore, _indexer, options, repositoryLogger);
     }
 
     public void Dispose()
@@ -89,7 +87,7 @@ public class DecisionSpecRepositoryTests : IDisposable
         await _repository.CreateAsync(spec);
 
         // Assert - Verify audit log file exists
-        var auditPath = Path.Combine(_tempDirectory, "draft", "test-spec-2.1.0.0.audit.jsonl");
+        var auditPath = Path.Combine(_tempDirectory, "draft", "test-spec-2.audit.jsonl");
         File.Exists(auditPath).Should().BeTrue();
 
         // Read and verify audit entry
@@ -208,7 +206,7 @@ public class DecisionSpecRepositoryTests : IDisposable
         await _repository.UpdateAsync("test-spec-8", created, etag);
 
         // Assert - Verify audit log contains update entry
-        var auditPath = Path.Combine(_tempDirectory, "draft", "test-spec-8.1.0.0.audit.jsonl");
+        var auditPath = Path.Combine(_tempDirectory, "draft", "test-spec-8.audit.jsonl");
         var auditLines = await File.ReadAllLinesAsync(auditPath);
         auditLines.Should().HaveCountGreaterThan(1);
         auditLines.Last().Should().Contain("Updated");
@@ -280,7 +278,7 @@ public class DecisionSpecRepositoryTests : IDisposable
 
         // Assert - Verify audit log in archive contains delete entry
         var archivePath = Path.Combine(_tempDirectory, "archive");
-        var auditFiles = Directory.GetFiles(archivePath, "test-spec-11*.audit.jsonl");
+        var auditFiles = Directory.GetFiles(archivePath, "test-spec-11.audit.jsonl.*");
         auditFiles.Should().NotBeEmpty();
 
         var auditContent = await File.ReadAllTextAsync(auditFiles.First());
@@ -333,7 +331,7 @@ public class DecisionSpecRepositoryTests : IDisposable
         await _repository.RestoreAsync("test-spec-13", "1.0.0");
 
         // Assert - Verify audit log contains restore entry
-        var auditPath = Path.Combine(_tempDirectory, "draft", "test-spec-13.1.0.0.audit.jsonl");
+        var auditPath = Path.Combine(_tempDirectory, "draft", "test-spec-13.audit.jsonl");
         File.Exists(auditPath).Should().BeTrue();
         
         var auditContent = await File.ReadAllTextAsync(auditPath);
@@ -510,22 +508,18 @@ public class DecisionSpecRepositoryTests : IDisposable
     {
         // Arrange - Create a spec with complex nested structures
         var spec = CreateSampleSpec("complex-spec", "1.0.0", "Draft");
-        spec.Questions.Add(new Question
+        spec.Traits.Add(new TraitDefinition
         {
-            QuestionId = "q2",
-            Type = "MultiSelect",
-            Prompt = "Select all that apply",
-            HelpText = "Choose multiple options",
+            Key = "q2",
+            AnswerType = "MultiSelect",
+            QuestionText = "Select all that apply",
+            Comment = "Choose multiple options",
             Required = false,
-            Options = new List<Option>
+            Options = new List<string> { "Option A", "Option B" },
+            Bounds = new TraitBounds
             {
-                new() { OptionId = "o2a", Label = "Option A", Value = "a", NextQuestionId = "q3" },
-                new() { OptionId = "o2b", Label = "Option B", Value = "b" }
-            },
-            Validation = new Dictionary<string, object>
-            {
-                ["minSelections"] = 1,
-                ["maxSelections"] = 3
+                Min = 1,
+                Max = 3
             }
         });
 
@@ -537,11 +531,12 @@ public class DecisionSpecRepositoryTests : IDisposable
         retrieved.Should().NotBeNull();
         var doc = retrieved.Value.Document;
         
-        doc.Questions.Should().HaveCount(2);
-        doc.Questions[1].Type.Should().Be("MultiSelect");
-        doc.Questions[1].Options.Should().HaveCount(2);
-        doc.Questions[1].Validation.Should().ContainKey("minSelections");
-        doc.Questions[1].Validation!["minSelections"].ToString().Should().Be("1");
+        doc.Traits.Should().HaveCount(2);
+        doc.Traits[1].AnswerType.Should().Be("MultiSelect");
+        doc.Traits[1].Options.Should().HaveCount(2);
+        doc.Traits[1].Bounds.Should().NotBeNull();
+        doc.Traits[1].Bounds!.Min.Should().Be(1);
+        doc.Traits[1].Bounds!.Max.Should().Be(3);
     }
 
     [Fact]
@@ -550,7 +545,7 @@ public class DecisionSpecRepositoryTests : IDisposable
         // Arrange
         var spec = CreateSampleSpec("special-chars", "1.0.0", "Draft");
         spec.Metadata.Description = "Test with special chars: \"quotes\", 'apostrophes', \n newlines, \t tabs";
-        spec.Questions[0].Prompt = "What's your favorite <choice>?";
+        spec.Traits[0].QuestionText = "What's your favorite <choice>?";
 
         // Act
         await _repository.CreateAsync(spec);
@@ -559,7 +554,7 @@ public class DecisionSpecRepositoryTests : IDisposable
         // Assert
         retrieved.Should().NotBeNull();
         retrieved.Value.Document.Metadata.Description.Should().Contain("\"quotes\"");
-        retrieved.Value.Document.Questions[0].Prompt.Should().Contain("<choice>");
+        retrieved.Value.Document.Traits[0].QuestionText.Should().Contain("<choice>");
     }
 
     #endregion
@@ -580,31 +575,15 @@ public class DecisionSpecRepositoryTests : IDisposable
                 Owner = "test-user",
                 Tags = new List<string> { "test", "automated" }
             },
-            Questions = new List<Question>
+            Traits = new List<TraitDefinition>
             {
                 new()
                 {
-                    QuestionId = "q1",
-                    Type = "SingleSelect",
-                    Prompt = "What is your primary goal?",
+                    Key = "q1",
+                    QuestionText = "What is your primary goal?",
+                    AnswerType = "SingleSelect",
                     Required = true,
-                    Options = new List<Option>
-                    {
-                        new() { OptionId = "o1", Label = "Option 1", Value = "opt1" },
-                        new() { OptionId = "o2", Label = "Option 2", Value = "opt2" }
-                    }
-                }
-            },
-            Outcomes = new List<Outcome>
-            {
-                new()
-                {
-                    OutcomeId = "outcome1",
-                    SelectionRules = new List<string> { "q1:opt1" },
-                    DisplayCards = new List<OutcomeDisplayCard>
-                    {
-                        new() { Title = "Outcome 1", Description = "First outcome" }
-                    }
+                    Options = new List<string> { "Option 1", "Option 2" }
                 }
             }
         };

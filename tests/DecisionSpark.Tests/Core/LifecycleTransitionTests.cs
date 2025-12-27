@@ -19,7 +19,7 @@ namespace DecisionSpark.Tests.Core;
 public class LifecycleTransitionTests
 {
     private readonly Mock<IDecisionSpecRepository> _mockRepository;
-    private readonly Mock<QuestionPatchService> _mockPatchService;
+    private readonly Mock<TraitPatchService> _mockPatchService;
     private readonly Mock<ILogger<DecisionSpecsApiController>> _mockLogger;
     private readonly DecisionSpecsApiController _controller;
 
@@ -28,8 +28,8 @@ public class LifecycleTransitionTests
         _mockRepository = new Mock<IDecisionSpecRepository>();
         _mockLogger = new Mock<ILogger<DecisionSpecsApiController>>();
         
-        var patchServiceLogger = new Mock<ILogger<QuestionPatchService>>();
-        _mockPatchService = new Mock<QuestionPatchService>(_mockRepository.Object, patchServiceLogger.Object);
+        var patchServiceLogger = new Mock<ILogger<TraitPatchService>>();
+        _mockPatchService = new Mock<TraitPatchService>(_mockRepository.Object, patchServiceLogger.Object);
 
         _controller = new DecisionSpecsApiController(
             _mockRepository.Object,
@@ -322,15 +322,12 @@ public class LifecycleTransitionTests
     {
         // Arrange
         var doc = CreateSampleDocument("test-spec", "1.0.0", "InReview");
-        doc.Questions.Add(new Question
+        doc.Traits.Add(new TraitDefinition
         {
-            QuestionId = "q2",
-            Type = "MultiSelect",
-            Prompt = "Additional question",
-            Options = new List<Option>
-            {
-                new() { OptionId = "o3", Label = "Option 3", Value = "opt3" }
-            }
+            Key = "q2",
+            AnswerType = "MultiSelect",
+            QuestionText = "Additional question",
+            Options = new List<string> { "Option 3" }
         });
         var etag = "etag-123";
 
@@ -349,8 +346,8 @@ public class LifecycleTransitionTests
 
         // Assert
         capturedDoc.Should().NotBeNull();
-        capturedDoc!.Questions.Should().HaveCount(2);
-        capturedDoc.Questions[1].QuestionId.Should().Be("q2");
+        capturedDoc!.Traits.Should().HaveCount(2);
+        capturedDoc.Traits[1].Key.Should().Be("q2");
     }
 
     [Fact]
@@ -446,27 +443,15 @@ public class LifecycleTransitionTests
                 Tags = new List<string> { "test" },
                 UpdatedAt = DateTimeOffset.UtcNow.AddDays(-1)
             },
-            Questions = new List<Question>
+            Traits = new List<TraitDefinition>
             {
                 new()
                 {
-                    QuestionId = "q1",
-                    Type = "SingleSelect",
-                    Prompt = "Test question?",
+                    Key = "q1",
+                    AnswerType = "SingleSelect",
+                    QuestionText = "Test question?",
                     Required = true,
-                    Options = new List<Option>
-                    {
-                        new() { OptionId = "o1", Label = "Option 1", Value = "opt1" }
-                    }
-                }
-            },
-            Outcomes = new List<Outcome>
-            {
-                new()
-                {
-                    OutcomeId = "outcome1",
-                    SelectionRules = new List<string> { "q1:opt1" },
-                    DisplayCards = new List<OutcomeDisplayCard>()
+                    Options = new List<string> { "Option 1" }
                 }
             }
         };

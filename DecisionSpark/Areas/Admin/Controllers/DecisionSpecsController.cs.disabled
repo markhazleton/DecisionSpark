@@ -125,6 +125,8 @@ public class DecisionSpecsController : Controller
                 Version = doc.Version,
                 Status = doc.Status,
                 ETag = etag,
+                CanonicalBaseUrl = doc.CanonicalBaseUrl,
+                SafetyPreamble = doc.SafetyPreamble,
                 Metadata = new DecisionSpecMetadataViewModel
                 {
                     Name = doc.Metadata.Name,
@@ -137,7 +139,17 @@ public class DecisionSpecsController : Controller
                     Type = q.Type,
                     Prompt = q.Prompt,
                     HelpText = q.HelpText,
+                    ParseHint = q.ParseHint,
                     Required = q.Required,
+                    IsPseudoTrait = q.IsPseudoTrait,
+                    AllowMultiple = q.AllowMultiple,
+                    DependsOn = q.DependsOn?.ToList() ?? new List<string>(),
+                    Comment = q.Comment,
+                    Bounds = q.Bounds != null ? new QuestionBoundsViewModel 
+                    { 
+                        Min = q.Bounds.Min, 
+                        Max = q.Bounds.Max 
+                    } : null,
                     Options = q.Options.Select(o => new OptionViewModel
                     {
                         OptionId = o.OptionId,
@@ -147,11 +159,66 @@ public class DecisionSpecsController : Controller
                     }).ToList(),
                     Validation = q.Validation
                 }).ToList(),
+                DerivedTraits = doc.DerivedTraits?.Select(dt => new DerivedTraitViewModel
+                {
+                    Key = dt.Key,
+                    Expression = dt.Expression
+                }).ToList() ?? new List<DerivedTraitViewModel>(),
+                ImmediateSelectRules = doc.ImmediateSelectIf?.Select(isr => new ImmediateSelectRuleViewModel
+                {
+                    OutcomeId = isr.OutcomeId,
+                    Rule = isr.Rule
+                }).ToList() ?? new List<ImmediateSelectRuleViewModel>(),
                 Outcomes = doc.Outcomes.Select(o => new OutcomeViewModel
                 {
                     OutcomeId = o.OutcomeId,
-                    SelectionRules = o.SelectionRules?.ToList() ?? new List<string>()
-                }).ToList()
+                    SelectionRules = o.SelectionRules?.ToList() ?? new List<string>(),
+                    CareTypeMessage = o.CareTypeMessage,
+                    DisplayCards = o.DisplayCards?.Select(dc => new OutcomeDisplayCardViewModel
+                    {
+                        Title = dc.Title,
+                        Subtitle = dc.Subtitle,
+                        GroupId = dc.GroupId,
+                        CareTypeMessage = dc.CareTypeMessage,
+                        IconUrl = dc.IconUrl,
+                        Description = dc.Description,
+                        BodyText = dc.BodyText?.ToList() ?? new List<string>(),
+                        CareTypeDetails = dc.CareTypeDetails?.ToList() ?? new List<string>(),
+                        Rules = dc.Rules?.ToList() ?? new List<string>()
+                    }).ToList() ?? new List<OutcomeDisplayCardViewModel>(),
+                    FinalResult = o.FinalResult != null ? new OutcomeFinalResultViewModel
+                    {
+                        ResolutionButtonLabel = o.FinalResult.ResolutionButtonLabel,
+                        ResolutionButtonUrl = o.FinalResult.ResolutionButtonUrl,
+                        AnalyticsResolutionCode = o.FinalResult.AnalyticsResolutionCode
+                    } : null
+                }).ToList(),
+                TieStrategy = doc.TieStrategy != null ? new TieStrategyViewModel
+                {
+                    Mode = doc.TieStrategy.Mode,
+                    ClarifierMaxAttempts = doc.TieStrategy.ClarifierMaxAttempts,
+                    PseudoTraits = doc.TieStrategy.PseudoTraits?.Select(pt => new QuestionViewModel
+                    {
+                        QuestionId = pt.QuestionId,
+                        Type = pt.Type,
+                        Prompt = pt.Prompt,
+                        HelpText = pt.HelpText,
+                        ParseHint = pt.ParseHint,
+                        Required = pt.Required,
+                        IsPseudoTrait = pt.IsPseudoTrait,
+                        Options = pt.Options?.Select(o => new OptionViewModel
+                        {
+                            OptionId = o.OptionId,
+                            Label = o.Label,
+                            Value = o.Value
+                        }).ToList() ?? new List<OptionViewModel>()
+                    }).ToList() ?? new List<QuestionViewModel>(),
+                    LlmPromptTemplate = doc.TieStrategy.LlmPromptTemplate
+                } : null,
+                Disambiguation = doc.Disambiguation != null ? new DisambiguationViewModel
+                {
+                    FallbackTraitOrder = doc.Disambiguation.FallbackTraitOrder?.ToList() ?? new List<string>()
+                } : null
             };
 
             return View(viewModel);
@@ -175,6 +242,22 @@ public class DecisionSpecsController : Controller
     {
         if (!ModelState.IsValid)
         {
+            _logger.LogWarning("Model validation failed for DecisionSpec {SpecId}. Errors: {Errors}", 
+                viewModel.SpecId, 
+                string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+            
+            // Add a summary of all validation errors
+            var errorMessages = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .Where(m => !string.IsNullOrWhiteSpace(m))
+                .ToList();
+            
+            if (errorMessages.Any())
+            {
+                ModelState.AddModelError("", $"Validation failed: {string.Join(", ", errorMessages)}");
+            }
+            
             return View("Edit", viewModel);
         }
 
@@ -199,8 +282,9 @@ public class DecisionSpecsController : Controller
                 
                 if (result == null)
                 {
-                    TempData["Error"] = "DecisionSpec not found.";
-                    return RedirectToAction(nameof(Index));
+                    _logger.LogWarning("DecisionSpec {SpecId} not found during update", viewModel.SpecId);
+                    ModelState.AddModelError("", $"DecisionSpec '{viewModel.SpecId}' not found.");
+                    return View("Edit", viewModel);
                 }
 
                 var (updated, etag) = result.Value;
@@ -211,6 +295,33 @@ public class DecisionSpecsController : Controller
                 return RedirectToAction(nameof(Details), new { specId = updated.SpecId });
             }
         }
+        catch (FluentValidation.ValidationException vex)
+        {
+            _logger.LogWarning("FluentValidation failed for DecisionSpec {SpecId}: {Errors}", 
+                viewModel.SpecId, 
+                string.Join("; ", vex.Errors.Select(e => $"{e.PropertyName}: {e.ErrorMessage}")));
+            
+            // Add each validation error to ModelState
+            foreach (var error in vex.Errors)
+            {
+                var propertyName = error.PropertyName;
+                if (string.IsNullOrEmpty(propertyName))
+                {
+                    ModelState.AddModelError("", error.ErrorMessage);
+                }
+                else
+                {
+                    ModelState.AddModelError(propertyName, error.ErrorMessage);
+                }
+            }
+            
+            // Also add a summary
+            var errorSummary = string.Join(", ", vex.Errors.Select(e => 
+                string.IsNullOrEmpty(e.PropertyName) ? e.ErrorMessage : $"{e.PropertyName}: {e.ErrorMessage}"));
+            ModelState.AddModelError("", $"Validation failed: {errorSummary}");
+            
+            return View("Edit", viewModel);
+        }
         catch (InvalidOperationException ex) when (ex.Message.Contains("ETag mismatch"))
         {
             _logger.LogWarning("Concurrency conflict while saving DecisionSpec {SpecId}", viewModel.SpecId);
@@ -220,11 +331,27 @@ public class DecisionSpecsController : Controller
             
             return View("Edit", viewModel);
         }
+        catch (ArgumentException argEx)
+        {
+            _logger.LogWarning(argEx, "Invalid argument while saving DecisionSpec {SpecId}", viewModel.SpecId);
+            
+            ModelState.AddModelError("", $"Invalid data: {argEx.Message}");
+            return View("Edit", viewModel);
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error saving DecisionSpec {SpecId}", viewModel.SpecId);
+            _logger.LogError(ex, "Error saving DecisionSpec {SpecId}: {Message}", viewModel.SpecId, ex.Message);
             
-            ModelState.AddModelError("", "An error occurred while saving. Please try again.");
+            // Include the actual error message instead of generic one
+            ModelState.AddModelError("", $"An error occurred while saving: {ex.Message}");
+            
+            // If there's an inner exception, include that too
+            if (ex.InnerException != null)
+            {
+                ModelState.AddModelError("", $"Details: {ex.InnerException.Message}");
+                _logger.LogError(ex.InnerException, "Inner exception details");
+            }
+            
             return View("Edit", viewModel);
         }
     }
@@ -425,6 +552,39 @@ public class DecisionSpecsController : Controller
         return RedirectToAction(nameof(Details), new { specId });
     }
 
+    /// <summary>
+    /// Displays the full JSON representation of a DecisionSpec.
+    /// </summary>
+    [HttpGet("ViewJson/{specId}")]
+    public async Task<IActionResult> ViewJson(
+        string specId,
+        [FromQuery] string? version = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var json = await _repository.GetFullDocumentJsonAsync(specId, version, cancellationToken);
+            
+            if (json == null)
+            {
+                TempData["Error"] = $"DecisionSpec '{specId}' not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            ViewBag.SpecId = specId;
+            ViewBag.Version = version;
+            ViewBag.JsonContent = json;
+
+            return View();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading JSON for DecisionSpec {SpecId}", specId);
+            TempData["Error"] = "Failed to load JSON. Please try again.";
+            return RedirectToAction(nameof(Details), new { specId });
+        }
+    }
+
     #region Helper Methods
 
     private static DecisionSpark.Core.Models.Spec.DecisionSpecDocument MapToDocument(DecisionSpecEditViewModel viewModel)
@@ -434,6 +594,8 @@ public class DecisionSpecsController : Controller
             SpecId = viewModel.SpecId,
             Version = viewModel.Version,
             Status = viewModel.Status,
+            CanonicalBaseUrl = viewModel.CanonicalBaseUrl,
+            SafetyPreamble = viewModel.SafetyPreamble,
             Metadata = new DecisionSpark.Core.Models.Spec.DecisionSpecMetadata
             {
                 Name = viewModel.Metadata.Name,
@@ -446,7 +608,17 @@ public class DecisionSpecsController : Controller
                 Type = q.Type,
                 Prompt = q.Prompt,
                 HelpText = q.HelpText,
+                ParseHint = q.ParseHint,
                 Required = q.Required,
+                IsPseudoTrait = q.IsPseudoTrait,
+                AllowMultiple = q.AllowMultiple,
+                DependsOn = q.DependsOn,
+                Comment = q.Comment,
+                Bounds = q.Bounds != null ? new DecisionSpark.Core.Models.Spec.QuestionBounds 
+                { 
+                    Min = q.Bounds.Min, 
+                    Max = q.Bounds.Max 
+                } : null,
                 Options = q.Options.Select(o => new DecisionSpark.Core.Models.Spec.Option
                 {
                     OptionId = o.OptionId,
@@ -456,11 +628,66 @@ public class DecisionSpecsController : Controller
                 }).ToList(),
                 Validation = q.Validation
             }).ToList(),
+            DerivedTraits = viewModel.DerivedTraits.Select(dt => new DecisionSpark.Core.Models.Spec.DerivedTrait
+            {
+                Key = dt.Key,
+                Expression = dt.Expression
+            }).ToList(),
+            ImmediateSelectIf = viewModel.ImmediateSelectRules.Select(isr => new DecisionSpark.Core.Models.Spec.ImmediateSelectRule
+            {
+                OutcomeId = isr.OutcomeId,
+                Rule = isr.Rule
+            }).ToList(),
             Outcomes = viewModel.Outcomes.Select(o => new DecisionSpark.Core.Models.Spec.Outcome
             {
                 OutcomeId = o.OutcomeId,
-                SelectionRules = o.SelectionRules
-            }).ToList()
+                SelectionRules = o.SelectionRules,
+                CareTypeMessage = o.CareTypeMessage,
+                DisplayCards = o.DisplayCards.Select(dc => new DecisionSpark.Core.Models.Spec.OutcomeDisplayCard
+                {
+                    Title = dc.Title,
+                    Subtitle = dc.Subtitle,
+                    GroupId = dc.GroupId,
+                    CareTypeMessage = dc.CareTypeMessage,
+                    IconUrl = dc.IconUrl,
+                    Description = dc.Description,
+                    BodyText = dc.BodyText,
+                    CareTypeDetails = dc.CareTypeDetails,
+                    Rules = dc.Rules
+                }).ToList(),
+                FinalResult = o.FinalResult != null ? new DecisionSpark.Core.Models.Spec.OutcomeFinalResult
+                {
+                    ResolutionButtonLabel = o.FinalResult.ResolutionButtonLabel,
+                    ResolutionButtonUrl = o.FinalResult.ResolutionButtonUrl,
+                    AnalyticsResolutionCode = o.FinalResult.AnalyticsResolutionCode
+                } : null
+            }).ToList(),
+            TieStrategy = viewModel.TieStrategy != null ? new DecisionSpark.Core.Models.Spec.TieStrategy
+            {
+                Mode = viewModel.TieStrategy.Mode,
+                ClarifierMaxAttempts = viewModel.TieStrategy.ClarifierMaxAttempts,
+                PseudoTraits = viewModel.TieStrategy.PseudoTraits.Select(pt => new DecisionSpark.Core.Models.Spec.Question
+                {
+                    QuestionId = pt.QuestionId,
+                    Type = pt.Type,
+                    Prompt = pt.Prompt,
+                    HelpText = pt.HelpText,
+                    ParseHint = pt.ParseHint,
+                    Required = pt.Required,
+                    IsPseudoTrait = pt.IsPseudoTrait,
+                    Options = pt.Options.Select(o => new DecisionSpark.Core.Models.Spec.Option
+                    {
+                        OptionId = o.OptionId,
+                        Label = o.Label,
+                        Value = o.Value
+                    }).ToList()
+                }).ToList(),
+                LlmPromptTemplate = viewModel.TieStrategy.LlmPromptTemplate
+            } : null,
+            Disambiguation = viewModel.Disambiguation != null ? new DecisionSpark.Core.Models.Spec.Disambiguation
+            {
+                FallbackTraitOrder = viewModel.Disambiguation.FallbackTraitOrder
+            } : null
         };
     }
 

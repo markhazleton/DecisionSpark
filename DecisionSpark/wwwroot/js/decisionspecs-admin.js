@@ -92,9 +92,9 @@ function validateForm() {
     // Validate SpecId format
     const specIdInput = document.getElementById('SpecId');
     if (specIdInput && specIdInput.value) {
-        const specIdPattern = /^[a-z0-9-]+$/;
+        const specIdPattern = /^[A-Za-z0-9_-]+$/;
         if (!specIdPattern.test(specIdInput.value)) {
-            markFieldInvalid(specIdInput, 'Spec ID must contain only lowercase letters, numbers, and hyphens');
+            markFieldInvalid(specIdInput, 'Spec ID must contain only letters, numbers, underscores, and hyphens');
             isValid = false;
         }
     }
@@ -117,6 +117,32 @@ function validateForm() {
             showError('At least one question is required');
             isValid = false;
         }
+
+        // Validate select-type questions have at least one option
+        questions.forEach(function(questionEditor) {
+            const questionIndex = questionEditor.getAttribute('data-index');
+            const typeSelect = questionEditor.querySelector('select[name*=".Type"]');
+            
+            if (typeSelect) {
+                const questionType = typeSelect.value;
+                
+                if (questionType === 'SingleSelect' || questionType === 'MultiSelect') {
+                    const optionsContainer = questionEditor.querySelector(`#optionsContainer_${questionIndex}`);
+                    if (optionsContainer) {
+                        const options = optionsContainer.querySelectorAll('.input-group[data-option-index]');
+                        
+                        if (options.length === 0) {
+                            showError(`Question ${parseInt(questionIndex) + 1}: At least one option is required for ${questionType} questions`);
+                            
+                            // Highlight the question editor
+                            questionEditor.classList.add('border-danger');
+                            questionEditor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            isValid = false;
+                        }
+                    }
+                }
+            }
+        });
     }
 
     // Validate at least one outcome
@@ -204,6 +230,9 @@ function showError(message) {
  * Initialize form enhancements
  */
 function initializeFormEnhancements() {
+    // Initialize question type change handlers
+    initializeQuestionTypeHandlers();
+
     // Auto-expand textareas
     document.querySelectorAll('textarea').forEach(function(textarea) {
         textarea.addEventListener('input', function() {
@@ -252,6 +281,69 @@ function initializeFormEnhancements() {
             }
         });
     });
+}
+
+/**
+ * Initialize question type change handlers to show/hide options section
+ */
+function initializeQuestionTypeHandlers() {
+    const typeSelectors = document.querySelectorAll('.question-type-selector');
+    
+    typeSelectors.forEach(function(selector) {
+        selector.addEventListener('change', function() {
+            toggleOptionsSection(this);
+        });
+    });
+}
+
+/**
+ * Toggle options section visibility based on question type
+ */
+function toggleOptionsSection(typeSelector) {
+    const questionIndex = typeSelector.getAttribute('data-question-index');
+    const optionsSection = document.getElementById(`optionsSection_${questionIndex}`);
+    const selectedType = typeSelector.value;
+    
+    if (!optionsSection) return;
+    
+    if (selectedType === 'SingleSelect' || selectedType === 'MultiSelect') {
+        // Show options section
+        optionsSection.style.display = 'block';
+        
+        // Make option inputs required
+        const optionInputs = optionsSection.querySelectorAll('input[name*=".Options"][name*=".Label"]');
+        optionInputs.forEach(function(input) {
+            input.setAttribute('required', 'required');
+        });
+        
+        // Check if there are no options and show warning
+        const optionsContainer = optionsSection.querySelector(`#optionsContainer_${questionIndex}`);
+        if (optionsContainer) {
+            const existingOptions = optionsContainer.querySelectorAll('.input-group[data-option-index]');
+            
+            if (existingOptions.length === 0) {
+                // Show alert if no options exist
+                const existingAlert = optionsContainer.querySelector('.alert-warning');
+                if (!existingAlert) {
+                    const alertHtml = `
+                        <div class="alert alert-warning" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i> No options added yet. At least one option is required for ${selectedType} questions.
+                        </div>
+                    `;
+                    optionsContainer.insertAdjacentHTML('beforeend', alertHtml);
+                }
+            }
+        }
+    } else {
+        // Hide options section
+        optionsSection.style.display = 'none';
+        
+        // Remove required attribute from option inputs
+        const optionInputs = optionsSection.querySelectorAll('input[name*=".Options"][name*=".Label"]');
+        optionInputs.forEach(function(input) {
+            input.removeAttribute('required');
+        });
+    }
 }
 
 /**
@@ -320,5 +412,6 @@ window.DecisionSpecsAdmin = {
     showError: showError,
     handleApiError: handleApiError,
     addQuestionOption: addQuestionOption,
-    removeOption: removeOption
+    removeOption: removeOption,
+    toggleOptionsSection: toggleOptionsSection
 };

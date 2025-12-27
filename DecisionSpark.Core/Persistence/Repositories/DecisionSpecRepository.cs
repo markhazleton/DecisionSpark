@@ -14,27 +14,24 @@ public class DecisionSpecRepository : IDecisionSpecRepository
 {
     private readonly DecisionSpecFileStore _fileStore;
     private readonly FileSearchIndexer _indexer;
-    private readonly LegacyDecisionSpecAdapter _legacyAdapter;
     private readonly DecisionSpecsOptions _options;
     private readonly ILogger<DecisionSpecRepository> _logger;
 
     public DecisionSpecRepository(
         DecisionSpecFileStore fileStore,
         FileSearchIndexer indexer,
-        LegacyDecisionSpecAdapter legacyAdapter,
         IOptions<DecisionSpecsOptions> options,
         ILogger<DecisionSpecRepository> logger)
     {
         _fileStore = fileStore;
         _indexer = indexer;
-        _legacyAdapter = legacyAdapter;
         _options = options.Value;
         _logger = logger;
     }
 
     public async Task<(DecisionSpecDocument Document, string ETag)> CreateAsync(DecisionSpecDocument spec, CancellationToken cancellationToken = default)
     {
-        var json = JsonSerializer.Serialize(spec, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(spec, GetSerializerOptions());
         var etag = await _fileStore.WriteAsync(spec.SpecId, spec.Version, spec.Status, json, cancellationToken);
         
         await _indexer.UpdateEntryAsync(spec.SpecId, spec.Version, spec.Status, cancellationToken);
@@ -74,31 +71,10 @@ public class DecisionSpecRepository : IDecisionSpecRepository
             if (result != null)
             {
                 var (content, etag) = result.Value;
-                var doc = JsonSerializer.Deserialize<DecisionSpecDocument>(content);
+                var doc = JsonSerializer.Deserialize<DecisionSpecDocument>(content, GetSerializerOptions());
                 if (doc != null)
                 {
                     return (doc, etag);
-                }
-            }
-        }
-
-        // Try legacy location if configured
-        if (!string.IsNullOrWhiteSpace(_options.LegacyConfigPath) && Directory.Exists(_options.LegacyConfigPath))
-        {
-            var legacyFiles = Directory.GetFiles(_options.LegacyConfigPath, $"{specId}*.active.json", SearchOption.TopDirectoryOnly);
-            
-            if (legacyFiles.Length > 0)
-            {
-                var filePath = legacyFiles[0]; // Take first match
-                var content = await File.ReadAllTextAsync(filePath, cancellationToken);
-                var fileName = Path.GetFileName(filePath);
-                
-                var converted = _legacyAdapter.ConvertLegacySpec(content, fileName);
-                if (converted != null)
-                {
-                    var etag = ComputeETag(content);
-                    _logger.LogInformation("Loaded legacy spec {SpecId} from {FileName}", specId, fileName);
-                    return (converted, etag);
                 }
             }
         }
@@ -112,6 +88,13 @@ public class DecisionSpecRepository : IDecisionSpecRepository
         var hash = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(content));
         return Convert.ToBase64String(hash);
     }
+
+    private static JsonSerializerOptions GetSerializerOptions() => new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        WriteIndented = true,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
 
     public async Task<(DecisionSpecDocument Document, string ETag)?> UpdateAsync(string specId, DecisionSpecDocument spec, string ifMatchETag, CancellationToken cancellationToken = default)
     {
@@ -128,7 +111,7 @@ public class DecisionSpecRepository : IDecisionSpecRepository
         }
 
         // Write updated spec
-        var json = JsonSerializer.Serialize(spec, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(spec, GetSerializerOptions());
         var etag = await _fileStore.WriteAsync(spec.SpecId, spec.Version, spec.Status, json, cancellationToken);
         
         await _indexer.UpdateEntryAsync(spec.SpecId, spec.Version, spec.Status, cancellationToken);
@@ -160,20 +143,33 @@ public class DecisionSpecRepository : IDecisionSpecRepository
             throw new InvalidOperationException("ETag mismatch - concurrent modification detected");
         }
 
+        // Get audit path before deleting the spec file
+        var auditPath = await GetAuditPathAsync(specId, cancellationToken);
+
+        // Write the delete audit entry before moving to archive
+        await AppendAuditEntryAsync(specId, new AuditEntry
+        {
+            SpecId = specId,
+            Action = "Deleted",
+            Summary = $"Soft-deleted DecisionSpec {specId} v{version}",
+            Actor = "System",
+            Source = "API"
+        }, cancellationToken);
+
         var success = await _fileStore.SoftDeleteAsync(specId, version, current.Value.Document.Status, cancellationToken);
         
         if (success)
         {
             await _indexer.RemoveEntryAsync(specId, cancellationToken);
             
-            await AppendAuditEntryAsync(specId, new AuditEntry
+            // Move audit log to archive as well
+            if (auditPath != null && File.Exists(auditPath))
             {
-                SpecId = specId,
-                Action = "Deleted",
-                Summary = $"Soft-deleted DecisionSpec {specId} v{version}",
-                Actor = "System",
-                Source = "API"
-            }, cancellationToken);
+                var archiveDir = Path.Combine(_options.RootPath, "archive");
+                Directory.CreateDirectory(archiveDir);
+                var archiveAuditPath = Path.Combine(archiveDir, $"{specId}.audit.jsonl.{DateTimeOffset.UtcNow:yyyyMMddHHmmss}");
+                File.Move(auditPath, archiveAuditPath);
+            }
 
             _logger.LogInformation("Deleted DecisionSpec {SpecId} v{Version}", specId, version);
         }
@@ -189,6 +185,20 @@ public class DecisionSpecRepository : IDecisionSpecRepository
         if (!success)
         {
             return null;
+        }
+
+        // Restore audit log from archive
+        var archiveDir = Path.Combine(_options.RootPath, "archive");
+        if (Directory.Exists(archiveDir))
+        {
+            var auditFiles = Directory.GetFiles(archiveDir, $"{specId}.audit.jsonl.*").OrderByDescending(f => f).ToArray();
+            if (auditFiles.Any())
+            {
+                var draftDir = Path.Combine(_options.RootPath, "draft");
+                Directory.CreateDirectory(draftDir);
+                var restoredAuditPath = Path.Combine(draftDir, $"{specId}.audit.jsonl");
+                File.Move(auditFiles.First(), restoredAuditPath, overwrite: true);
+            }
         }
 
         await _indexer.UpdateEntryAsync(specId, version, "Draft", cancellationToken);
@@ -217,7 +227,7 @@ public class DecisionSpecRepository : IDecisionSpecRepository
             Owner = e.Owner,
             Version = e.Version,
             UpdatedAt = e.UpdatedAt,
-            QuestionCount = e.QuestionCount,
+            TraitCount = e.TraitCount,
             HasUnverifiedDraft = e.HasUnverifiedDraft,
             ETag = e.ETag
         }).ToList();
@@ -231,17 +241,20 @@ public class DecisionSpecRepository : IDecisionSpecRepository
             return null;
         }
 
-        return JsonSerializer.Serialize(result.Value.Document, new JsonSerializerOptions { WriteIndented = true });
+        return JsonSerializer.Serialize(result.Value.Document, GetSerializerOptions());
     }
 
     public async Task AppendAuditEntryAsync(string specId, AuditEntry entry, CancellationToken cancellationToken = default)
     {
-        var auditPath = Path.Combine(Path.GetDirectoryName(_fileStore.ListFiles("draft").FirstOrDefault() ?? "") ?? "", $"{specId}.audit.jsonl");
-        var auditDir = Path.GetDirectoryName(auditPath);
+        // Find which status directory the spec is in
+        var auditPath = await GetAuditPathAsync(specId, cancellationToken);
         
-        if (!string.IsNullOrEmpty(auditDir) && !Directory.Exists(auditDir))
+        if (auditPath == null)
         {
-            Directory.CreateDirectory(auditDir);
+            // Spec doesn't exist yet, use draft directory
+            var draftDir = Path.Combine(_options.RootPath, "draft");
+            Directory.CreateDirectory(draftDir);
+            auditPath = Path.Combine(draftDir, $"{specId}.audit.jsonl");
         }
 
         var json = JsonSerializer.Serialize(entry);
@@ -250,9 +263,24 @@ public class DecisionSpecRepository : IDecisionSpecRepository
 
     public async Task<IEnumerable<AuditEntry>> GetAuditHistoryAsync(string specId, CancellationToken cancellationToken = default)
     {
-        var auditPath = Path.Combine(Path.GetDirectoryName(_fileStore.ListFiles("draft").FirstOrDefault() ?? "") ?? "", $"{specId}.audit.jsonl");
+        // Check all possible locations for audit file
+        var auditPath = await GetAuditPathAsync(specId, cancellationToken);
         
-        if (!File.Exists(auditPath))
+        if (auditPath == null || !File.Exists(auditPath))
+        {
+            // Check archive directory
+            var archiveDir = Path.Combine(_options.RootPath, "archive");
+            if (Directory.Exists(archiveDir))
+            {
+                var archiveAuditFiles = Directory.GetFiles(archiveDir, $"{specId}.audit.jsonl*");
+                if (archiveAuditFiles.Any())
+                {
+                    auditPath = archiveAuditFiles.OrderByDescending(f => f).First();
+                }
+            }
+        }
+
+        if (auditPath == null || !File.Exists(auditPath))
         {
             return Enumerable.Empty<AuditEntry>();
         }
@@ -277,5 +305,25 @@ public class DecisionSpecRepository : IDecisionSpecRepository
         }
 
         return entries.OrderByDescending(e => e.CreatedAt);
+    }
+
+    private async Task<string?> GetAuditPathAsync(string specId, CancellationToken cancellationToken)
+    {
+        // Try to find the spec in any status directory
+        foreach (var status in new[] { "draft", "published", "inreview", "retired" })
+        {
+            var statusDir = Path.Combine(_options.RootPath, status);
+            if (Directory.Exists(statusDir))
+            {
+                var specFiles = Directory.GetFiles(statusDir, $"{specId}.*.json");
+                if (specFiles.Any())
+                {
+                    // Found the spec, return audit path in same directory
+                    return Path.Combine(statusDir, $"{specId}.audit.jsonl");
+                }
+            }
+        }
+
+        return null;
     }
 }

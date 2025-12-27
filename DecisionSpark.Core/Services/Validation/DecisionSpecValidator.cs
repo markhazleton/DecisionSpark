@@ -27,12 +27,12 @@ public class DecisionSpecValidator : AbstractValidator<DecisionSpecDocument>
             .NotNull().WithErrorCode("SPEC007").WithMessage("Metadata is required")
             .SetValidator(new MetadataValidator());
 
-        // Validate Questions exist and are valid
-        RuleFor(x => x.Questions)
-            .NotEmpty().WithErrorCode("SPEC008").WithMessage("At least one question is required");
+        // Validate Traits exist and are valid
+        RuleFor(x => x.Traits)
+            .NotEmpty().WithErrorCode("SPEC008").WithMessage("At least one trait is required");
 
-        RuleForEach(x => x.Questions)
-            .SetValidator(new QuestionValidator());
+        RuleForEach(x => x.Traits)
+            .SetValidator(new TraitValidator());
 
         // Validate Outcomes exist and are valid
         RuleFor(x => x.Outcomes)
@@ -60,61 +60,45 @@ public class MetadataValidator : AbstractValidator<DecisionSpecMetadata>
 }
 
 /// <summary>
-/// Validates individual questions.
+/// Validates individual trait definitions.
 /// </summary>
-public class QuestionValidator : AbstractValidator<Question>
+public class TraitValidator : AbstractValidator<TraitDefinition>
 {
-    public QuestionValidator()
+    public TraitValidator()
     {
-        RuleFor(x => x.QuestionId)
-            .NotEmpty().WithErrorCode("Q001").WithMessage("QuestionId is required")
-            .Matches(@"^[a-zA-Z0-9_-]+$").WithErrorCode("Q002").WithMessage("QuestionId must contain only letters, numbers, hyphens, and underscores");
+        RuleFor(x => x.Key)
+            .NotEmpty().WithErrorCode("T001").WithMessage("Key is required")
+            .Matches(@"^[a-zA-Z0-9_-]+$").WithErrorCode("T002").WithMessage("Key must contain only letters, numbers, hyphens, and underscores");
 
-        RuleFor(x => x.Type)
-            .NotEmpty().WithErrorCode("Q003").WithMessage("Question Type is required")
-            .Must(t => new[] { "SingleSelect", "MultiSelect", "Text" }.Contains(t))
-            .WithErrorCode("Q004").WithMessage("Question Type must be one of: SingleSelect, MultiSelect, Text");
+        RuleFor(x => x.AnswerType)
+            .NotEmpty().WithErrorCode("T003").WithMessage("AnswerType is required")
+            .Must(t => new[] { "choice", "multi", "text", "number", "date" }.Contains(t))
+            .WithErrorCode("T004").WithMessage("AnswerType must be one of: choice, multi, text, number, date");
 
-        RuleFor(x => x.Prompt)
-            .NotEmpty().WithErrorCode("Q005").WithMessage("Prompt is required")
-            .MaximumLength(500).WithErrorCode("Q006").WithMessage("Prompt must not exceed 500 characters");
+        RuleFor(x => x.QuestionText)
+            .NotEmpty().WithErrorCode("T005").WithMessage("QuestionText is required")
+            .MaximumLength(500).WithErrorCode("T006").WithMessage("QuestionText must not exceed 500 characters");
 
-        When(x => x.Type == "SingleSelect" || x.Type == "MultiSelect", () =>
+        When(x => x.Comment != null, () =>
         {
-            RuleFor(x => x.Options)
-                .NotEmpty().WithErrorCode("Q007").WithMessage("Options are required for SingleSelect and MultiSelect questions")
-                .Must(o => o.Select(x => x.OptionId).Distinct().Count() == o.Count)
-                .WithErrorCode("Q008").WithMessage("Option IDs must be unique within a question");
+            RuleFor(x => x.Comment)
+                .MaximumLength(500).WithErrorCode("T007").WithMessage("Comment must not exceed 500 characters");
         });
 
-        RuleForEach(x => x.Options)
-            .SetValidator(new OptionValidator());
-    }
-}
-
-/// <summary>
-/// Validates question options.
-/// </summary>
-public class OptionValidator : AbstractValidator<Option>
-{
-    public OptionValidator()
-    {
-        RuleFor(x => x.OptionId)
-            .NotEmpty().WithErrorCode("OPT001").WithMessage("OptionId is required");
-
-        RuleFor(x => x.Label)
-            .NotEmpty().WithErrorCode("OPT002").WithMessage("Label is required")
-            .MaximumLength(200).WithErrorCode("OPT003").WithMessage("Label must not exceed 200 characters");
-
-        RuleFor(x => x.Value)
-            .NotEmpty().WithErrorCode("OPT004").WithMessage("Value is required");
+        When(x => x.AnswerType == "choice" || x.AnswerType == "multi", () =>
+        {
+            RuleFor(x => x.Options)
+                .NotEmpty().WithErrorCode("T008").WithMessage("Options are required for choice and multi answer types")
+                .Must(options => options != null && options.Distinct().Count() == options.Count)
+                .WithErrorCode("T009").WithMessage("Option keys must be unique within a trait");
+        });
     }
 }
 
 /// <summary>
 /// Validates outcomes.
 /// </summary>
-public class OutcomeValidator : AbstractValidator<Outcome>
+public class OutcomeValidator : AbstractValidator<OutcomeDefinition>
 {
     public OutcomeValidator()
     {
@@ -138,10 +122,10 @@ public class QuestionBasedSpecValidator : AbstractValidator<DecisionSpecDocument
     {
         Include(new DecisionSpecValidator());
 
-        RuleFor(x => x.Questions)
-            .Must(questions => questions.Select(q => q.QuestionId).Distinct().Count() == questions.Count)
+        RuleFor(x => x.Traits)
+            .Must(traits => traits.Select(t => t.Key).Distinct().Count() == traits.Count)
             .WithErrorCode("QSPEC001")
-            .WithMessage("Question IDs must be unique across the entire spec");
+            .WithMessage("Trait keys must be unique across the entire spec");
 
         RuleFor(x => x.Outcomes)
             .Must(outcomes => outcomes.Select(o => o.OutcomeId).Distinct().Count() == outcomes.Count)

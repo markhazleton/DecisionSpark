@@ -15,7 +15,7 @@ public class DecisionSpecIndexEntry
     public string Owner { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
-    public int QuestionCount { get; set; }
+    public int TraitCount { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public bool HasUnverifiedDraft { get; set; }
     public string ETag { get; set; } = string.Empty;
@@ -29,19 +29,16 @@ public class FileSearchIndexer
     private readonly DecisionSpecsOptions _options;
     private readonly ILogger<FileSearchIndexer> _logger;
     private readonly DecisionSpecFileStore _fileStore;
-    private readonly LegacyDecisionSpecAdapter _legacyAdapter;
     private static readonly SemaphoreSlim _indexLock = new(1, 1);
 
     public FileSearchIndexer(
         IOptions<DecisionSpecsOptions> options,
         ILogger<FileSearchIndexer> logger,
-        DecisionSpecFileStore fileStore,
-        LegacyDecisionSpecAdapter legacyAdapter)
+        DecisionSpecFileStore fileStore)
     {
         _options = options.Value;
         _logger = logger;
         _fileStore = fileStore;
-        _legacyAdapter = legacyAdapter;
     }
 
     /// <summary>
@@ -70,7 +67,7 @@ public class FileSearchIndexer
                 Status = status,
                 Name = root.GetProperty("metadata").TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? specId : specId,
                 Owner = root.GetProperty("metadata").TryGetProperty("owner", out var ownerProp) ? ownerProp.GetString() ?? "Unknown" : "Unknown",
-                QuestionCount = root.GetProperty("questions").GetArrayLength(),
+                TraitCount = root.TryGetProperty("traits", out var traitsProp) ? traitsProp.GetArrayLength() : 0,
                 UpdatedAt = DateTimeOffset.UtcNow,
                 HasUnverifiedDraft = root.TryGetProperty("metadata", out var metaProp) && 
                                      metaProp.TryGetProperty("unverified", out var unverifiedProp) && 
@@ -185,7 +182,7 @@ public class FileSearchIndexer
                                     Status = fileStatus,
                                     Name = root.GetProperty("metadata").TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? specId : specId,
                                     Owner = root.GetProperty("metadata").TryGetProperty("owner", out var ownerProp) ? ownerProp.GetString() ?? "Unknown" : "Unknown",
-                                    QuestionCount = root.GetProperty("questions").GetArrayLength(),
+                                    TraitCount = root.TryGetProperty("traits", out var traitsProp) ? traitsProp.GetArrayLength() : 0,
                                     UpdatedAt = File.GetLastWriteTimeUtc(filePath),
                                     HasUnverifiedDraft = root.TryGetProperty("metadata", out var metaProp) &&
                                                          metaProp.TryGetProperty("unverified", out var unverifiedProp) &&
@@ -200,51 +197,6 @@ public class FileSearchIndexer
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to index file {FilePath}", filePath);
-                    }
-                }
-            }
-
-            // Scan legacy format files if LegacyConfigPath is configured
-            if (!string.IsNullOrWhiteSpace(_options.LegacyConfigPath) && Directory.Exists(_options.LegacyConfigPath))
-            {
-                _logger.LogInformation("Scanning legacy DecisionSpecs from {Path}", _options.LegacyConfigPath);
-                
-                var legacyFiles = Directory.GetFiles(_options.LegacyConfigPath, "*.active.json", SearchOption.TopDirectoryOnly);
-                
-                foreach (var filePath in legacyFiles)
-                {
-                    try
-                    {
-                        var content = await File.ReadAllTextAsync(filePath, cancellationToken);
-                        var fileName = Path.GetFileName(filePath);
-                        
-                        var converted = _legacyAdapter.ConvertLegacySpec(content, fileName);
-                        if (converted != null)
-                        {
-                            var entry = new DecisionSpecIndexEntry
-                            {
-                                SpecId = converted.SpecId,
-                                Version = converted.Version,
-                                Status = converted.Status,
-                                Name = converted.Metadata.Name,
-                                Owner = converted.Metadata.Owner,
-                                QuestionCount = converted.Questions.Count,
-                                UpdatedAt = File.GetLastWriteTimeUtc(filePath),
-                                HasUnverifiedDraft = converted.Metadata.Unverified,
-                                ETag = ComputeETag(content)
-                            };
-
-                            // Only add if not already in index from new location
-                            if (!newIndex.ContainsKey(entry.SpecId))
-                            {
-                                newIndex[entry.SpecId] = entry;
-                                _logger.LogDebug("Indexed legacy spec {SpecId} from {FileName}", entry.SpecId, fileName);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to index legacy file {FilePath}", filePath);
                     }
                 }
             }

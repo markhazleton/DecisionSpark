@@ -21,12 +21,13 @@ public class TraitDefinition
     public string AnswerType { get; set; } = string.Empty;
     public string ParseHint { get; set; } = string.Empty;
     public bool Required { get; set; }
- public bool IsPseudoTrait { get; set; }
+    public bool IsPseudoTrait { get; set; }
     public bool? AllowMultiple { get; set; }
     public List<string> DependsOn { get; set; } = new();
     public TraitBounds? Bounds { get; set; }
     public List<string>? Options { get; set; }
     public Dictionary<string, List<string>>? Mapping { get; set; }
+    public string? Comment { get; set; }
 }
 
 public class TraitBounds

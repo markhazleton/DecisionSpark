@@ -15,7 +15,7 @@ public class DecisionSpecEditViewModelValidator : AbstractValidator<DecisionSpec
             .WithMessage("Spec ID is required")
             .WithErrorCode("SPEC_ID_REQUIRED")
             .Matches(@"^[A-Za-z0-9_-]+$")
-            .WithMessage("Spec ID must contain only letters, numbers, underscores, and hyphens")
+            .WithMessage("Spec ID must contain only letters (uppercase/lowercase), numbers, underscores, and hyphens")
             .WithErrorCode("SPEC_ID_INVALID_FORMAT");
 
         RuleFor(x => x.Version)

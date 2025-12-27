@@ -27,7 +27,8 @@
         <label for="Questions_@(index)__Type" class="form-label">Question Type *</label>
         <select name="Questions[@index].Type" 
                 id="Questions_@(index)__Type"
-                class="form-select" 
+                class="form-select question-type-selector" 
+                data-question-index="@index"
                 required>
             <option value="SingleSelect" selected="@(Model.Type == "SingleSelect")">Single Select</option>
             <option value="MultiSelect" selected="@(Model.Type == "MultiSelect")">Multi Select</option>
@@ -57,23 +58,101 @@
                placeholder="Additional guidance for users (optional)" />
     </div>
 
-    <div class="mb-3 form-check">
-        <input type="checkbox" 
-               name="Questions[@index].Required" 
-               id="Questions_@(index)__Required"
-               class="form-check-input" 
-               checked="@Model.Required" 
-               value="true" />
-        <input type="hidden" name="Questions[@index].Required" value="false" />
-        <label class="form-check-label" for="Questions_@(index)__Required">
-            Required question
-        </label>
+    <div class="mb-3">
+        <label for="Questions_@(index)__ParseHint" class="form-label">Parse Hint</label>
+        <textarea name="Questions[@index].ParseHint" 
+                  id="Questions_@(index)__ParseHint"
+                  class="form-control" 
+                  rows="2"
+                  placeholder="Instructions for LLM to parse user responses...">@Model.ParseHint</textarea>
+        <small class="form-text text-muted">Guide the LLM on how to interpret answers</small>
     </div>
+
+    <div class="mb-3">
+        <label for="Questions_@(index)__Comment" class="form-label">Comment</label>
+        <input type="text" 
+               name="Questions[@index].Comment" 
+               id="Questions_@(index)__Comment"
+               value="@Model.Comment" 
+               class="form-control" 
+               placeholder="Internal comment about this question" />
+        <small class="form-text text-muted">For documentation purposes</small>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <div class="form-check">
+                <input type="checkbox" 
+                       name="Questions[@index].Required" 
+                       id="Questions_@(index)__Required"
+                       class="form-check-input" 
+                       checked="@Model.Required" 
+                       value="true" />
+                <input type="hidden" name="Questions[@index].Required" value="false" />
+                <label class="form-check-label" for="Questions_@(index)__Required">
+                    Required question
+                </label>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check">
+                <input type="checkbox" 
+                       name="Questions[@index].IsPseudoTrait" 
+                       id="Questions_@(index)__IsPseudoTrait"
+                       class="form-check-input" 
+                       checked="@Model.IsPseudoTrait" 
+                       value="true" />
+                <input type="hidden" name="Questions[@index].IsPseudoTrait" value="false" />
+                <label class="form-check-label" for="Questions_@(index)__IsPseudoTrait">
+                    Is pseudo-trait
+                </label>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check">
+                <input type="checkbox" 
+                       name="Questions[@index].AllowMultiple" 
+                       id="Questions_@(index)__AllowMultiple"
+                       class="form-check-input" 
+                       checked="@Model.AllowMultiple" 
+                       value="true" />
+                <input type="hidden" name="Questions[@index].AllowMultiple" value="false" />
+                <label class="form-check-label" for="Questions_@(index)__AllowMultiple">
+                    Allow multiple selections
+                </label>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.Type == "Number")
+    {
+        <div class="mb-3">
+            <label class="form-label">Bounds (Optional)</label>
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <input type="number" 
+                           name="Questions[@index].Bounds.Min" 
+                           value="@Model.Bounds?.Min"
+                           class="form-control" 
+                           placeholder="Min value" />
+                </div>
+                <div class="col-md-6">
+                    <input type="number" 
+                           name="Questions[@index].Bounds.Max" 
+                           value="@Model.Bounds?.Max"
+                           class="form-control" 
+                           placeholder="Max value" />
+                </div>
+            </div>
+            <small class="form-text text-muted">Set minimum and maximum allowed values</small>
+        </div>
+    }
 
     @if (Model.Type == "SingleSelect" || Model.Type == "MultiSelect")
     {
-        <div class="mb-3">
-            <label class="form-label">Options</label>
+        <div class="mb-3 options-section" id="optionsSection_@index" data-question-index="@index">
+            <label class="form-label">Options *</label>
+            <small class="form-text text-muted d-block mb-2">At least one option is required for select-type questions</small>
             <div id="optionsContainer_@index">
                 @for (int i = 0; i < Model.Options.Count; i++)
                 {
@@ -84,7 +163,8 @@
                                name="Questions[@index].Options[@i].Label" 
                                value="@option.Label"
                                class="form-control" 
-                               placeholder="Option label" />
+                               placeholder="Option label" 
+                               required />
                         <input type="text" 
                                name="Questions[@index].Options[@i].Value" 
                                value="@option.Value"
@@ -95,6 +175,24 @@
                         </button>
                     </div>
                 }
+                @if (Model.Options.Count == 0)
+                {
+                    <div class="alert alert-warning" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i> No options added yet. At least one option is required for @Model.Type questions.
+                    </div>
+                }
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addOption(@index)">
+                <i class="bi bi-plus"></i> Add Option
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="mb-3 options-section" id="optionsSection_@index" data-question-index="@index" style="display: none;">
+            <label class="form-label">Options *</label>
+            <small class="form-text text-muted d-block mb-2">At least one option is required for select-type questions</small>
+            <div id="optionsContainer_@index">
             </div>
             <button type="button" class="btn btn-sm btn-outline-primary" onclick="addOption(@index)">
                 <i class="bi bi-plus"></i> Add Option

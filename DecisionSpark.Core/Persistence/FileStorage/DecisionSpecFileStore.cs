@@ -118,6 +118,12 @@ public class DecisionSpecFileStore
         try
         {
             var archiveDir = Path.Combine(_options.RootPath, "archive");
+            
+            if (!Directory.Exists(archiveDir))
+            {
+                return false;
+            }
+
             var pattern = $"{specId}.{version}.{status}.json.*";
             var archiveFiles = Directory.GetFiles(archiveDir, pattern).OrderByDescending(f => f).ToList();
 

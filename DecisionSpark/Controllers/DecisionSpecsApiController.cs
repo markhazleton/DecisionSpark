@@ -12,20 +12,19 @@ namespace DecisionSpark.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/decisionspecs")]
-[ServiceFilter(typeof(ApiKeyAuthenticationMiddleware))]
 public class DecisionSpecsApiController : ControllerBase
 {
     private readonly IDecisionSpecRepository _repository;
-    private readonly QuestionPatchService _questionPatchService;
+    private readonly TraitPatchService _traitPatchService;
     private readonly ILogger<DecisionSpecsApiController> _logger;
 
     public DecisionSpecsApiController(
         IDecisionSpecRepository repository,
-        QuestionPatchService questionPatchService,
+        TraitPatchService traitPatchService,
         ILogger<DecisionSpecsApiController> logger)
     {
         _repository = repository;
-        _questionPatchService = questionPatchService;
+        _traitPatchService = traitPatchService;
         _logger = logger;
     }
 
@@ -298,14 +297,14 @@ public class DecisionSpecsApiController : ControllerBase
     /// <summary>
     /// Patches a single question within a DecisionSpec.
     /// </summary>
-    [HttpPatch("{specId}/questions/{questionId}")]
+    [HttpPatch("{specId}/traits/{traitKey}")]
     [ProducesResponseType(typeof(DecisionSpecDocumentDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(Microsoft.AspNetCore.Mvc.ValidationProblemDetails), StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<DecisionSpecDocumentDto>> PatchQuestion(
+    public async Task<ActionResult<DecisionSpecDocumentDto>> PatchTrait(
         string specId,
-        string questionId,
-        [FromBody] QuestionPatchRequest request,
+        string traitKey,
+        [FromBody] TraitPatchRequest request,
         [FromHeader(Name = "If-Match")] string ifMatch,
         CancellationToken cancellationToken = default)
     {
@@ -324,21 +323,14 @@ public class DecisionSpecsApiController : ControllerBase
 
         try
         {
-            var options = request.Options?.Select(o => new Option
-            {
-                OptionId = o.OptionId,
-                Label = o.Label,
-                Value = o.Value,
-                NextQuestionId = o.NextQuestionId
-            }).ToList();
-
-            var result = await _questionPatchService.PatchQuestionAsync(
+            var result = await _traitPatchService.PatchTraitAsync(
                 specId,
-                questionId,
-                request.Prompt,
-                request.HelpText,
-                options,
-                request.Validation,
+                traitKey,
+                request.QuestionText,
+                request.ParseHint,
+                request.Options?.Select(o => o.Value).ToList(),
+                request.Bounds,
+                request.Comment,
                 ifMatch,
                 User.Identity?.Name ?? "API",
                 cancellationToken);
@@ -358,10 +350,10 @@ public class DecisionSpecsApiController : ControllerBase
             return NotFound(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
                 new Dictionary<string, string[]>
                 {
-                    ["questionId"] = new[] { $"Question {questionId} not found in spec {specId}" }
+                    ["traitKey"] = new[] { $"Trait {traitKey} not found in spec {specId}" }
                 })
             {
-                Title = "Question not found",
+                Title = "Trait not found",
                 Status = 404
             });
         }
@@ -501,7 +493,7 @@ public class DecisionSpecsApiController : ControllerBase
             Owner = summary.Owner,
             Version = summary.Version,
             UpdatedAt = summary.UpdatedAt,
-            QuestionCount = summary.QuestionCount,
+            TraitCount = summary.TraitCount,
             HasUnverifiedDraft = summary.HasUnverifiedDraft
         };
     }
@@ -519,30 +511,32 @@ public class DecisionSpecsApiController : ControllerBase
                 Description = request.Metadata.Description,
                 Tags = request.Metadata.Tags
             },
-            Questions = request.Questions.Select(q => new Question
+            Traits = request.Traits.Select(t => new TraitDefinition
             {
-                QuestionId = q.QuestionId,
-                Type = q.Type,
-                Prompt = q.Prompt,
-                HelpText = q.HelpText,
-                Required = q.Required,
-                Options = q.Options.Select(o => new Option
+                Key = t.Key,
+                QuestionText = t.QuestionText,
+                AnswerType = t.AnswerType,
+                ParseHint = t.ParseHint ?? string.Empty,
+                Required = t.Required,
+                IsPseudoTrait = t.IsPseudoTrait,
+                AllowMultiple = t.AllowMultiple,
+                DependsOn = t.DependsOn != null ? new List<string> { t.DependsOn } : new List<string>(),
+                Bounds = t.Bounds != null ? new TraitBounds
                 {
-                    OptionId = o.OptionId,
-                    Label = o.Label,
-                    Value = o.Value,
-                    NextQuestionId = o.NextQuestionId
-                }).ToList(),
-                Validation = q.Validation
+                    Min = t.Bounds.TryGetValue("min", out var min) ? Convert.ToInt32(min) : 0,
+                    Max = t.Bounds.TryGetValue("max", out var max) ? Convert.ToInt32(max) : int.MaxValue
+                } : null,
+                Options = t.Options?.Select(o => o.Value).ToList(),
+                Mapping = t.Mapping,
+                Comment = t.Comment
             }).ToList(),
-            Outcomes = request.Outcomes.Select(o => new Outcome
+            Outcomes = request.Outcomes.Select(o => new OutcomeDefinition
             {
                 OutcomeId = o.OutcomeId,
                 SelectionRules = o.SelectionRules,
-                DisplayCards = o.DisplayCards.Select(dc => new OutcomeDisplayCard
+                DisplayCards = o.DisplayCards.Select(dc => new DisplayCard
                 {
-                    Title = dc.ToString() ?? "",
-                    Description = ""
+                    Title = dc.ToString() ?? ""
                 }).ToList()
             }).ToList()
         };
@@ -561,30 +555,32 @@ public class DecisionSpecsApiController : ControllerBase
                 Description = dto.Metadata.Description,
                 Tags = dto.Metadata.Tags
             },
-            Questions = dto.Questions.Select(q => new Question
+            Traits = dto.Traits.Select(t => new TraitDefinition
             {
-                QuestionId = q.QuestionId,
-                Type = q.Type,
-                Prompt = q.Prompt,
-                HelpText = q.HelpText,
-                Required = q.Required,
-                Options = q.Options.Select(o => new Option
+                Key = t.Key,
+                QuestionText = t.QuestionText,
+                AnswerType = t.AnswerType,
+                ParseHint = t.ParseHint ?? string.Empty,
+                Required = t.Required,
+                IsPseudoTrait = t.IsPseudoTrait,
+                AllowMultiple = t.AllowMultiple,
+                DependsOn = t.DependsOn != null ? new List<string> { t.DependsOn } : new List<string>(),
+                Bounds = t.Bounds != null ? new TraitBounds
                 {
-                    OptionId = o.OptionId,
-                    Label = o.Label,
-                    Value = o.Value,
-                    NextQuestionId = o.NextQuestionId
-                }).ToList(),
-                Validation = q.Validation
+                    Min = t.Bounds.TryGetValue("min", out var min) ? Convert.ToInt32(min) : 0,
+                    Max = t.Bounds.TryGetValue("max", out var max) ? Convert.ToInt32(max) : int.MaxValue
+                } : null,
+                Options = t.Options?.Select(o => o.Value).ToList(),
+                Mapping = t.Mapping,
+                Comment = t.Comment
             }).ToList(),
-            Outcomes = dto.Outcomes.Select(o => new Outcome
+            Outcomes = dto.Outcomes.Select(o => new OutcomeDefinition
             {
                 OutcomeId = o.OutcomeId,
                 SelectionRules = o.SelectionRules,
-                DisplayCards = o.DisplayCards.Select(dc => new OutcomeDisplayCard
+                DisplayCards = o.DisplayCards.Select(dc => new DisplayCard
                 {
-                    Title = dc.ToString() ?? "",
-                    Description = ""
+                    Title = dc.ToString() ?? ""
                 }).ToList()
             }).ToList()
         };
@@ -599,25 +595,33 @@ public class DecisionSpecsApiController : ControllerBase
             Status = doc.Status,
             Metadata = new DecisionSpecMetadataDto
             {
-                Name = doc.Metadata.Name,
-                Description = doc.Metadata.Description,
-                Tags = doc.Metadata.Tags
+                Name = doc.Metadata?.Name ?? string.Empty,
+                Description = doc.Metadata?.Description ?? string.Empty,
+                Tags = doc.Metadata?.Tags ?? new List<string>()
             },
-            Questions = doc.Questions.Select(q => new QuestionDto
+            Traits = doc.Traits.Select(t => new TraitDto
             {
-                QuestionId = q.QuestionId,
-                Type = q.Type,
-                Prompt = q.Prompt,
-                HelpText = q.HelpText,
-                Required = q.Required,
-                Options = q.Options.Select(o => new OptionDto
+                Key = t.Key,
+                QuestionText = t.QuestionText,
+                AnswerType = t.AnswerType,
+                ParseHint = t.ParseHint,
+                Required = t.Required,
+                IsPseudoTrait = t.IsPseudoTrait,
+                AllowMultiple = t.AllowMultiple ?? false,
+                DependsOn = t.DependsOn.FirstOrDefault(),
+                Bounds = t.Bounds != null ? new Dictionary<string, object>
                 {
-                    OptionId = o.OptionId,
-                    Label = o.Label,
-                    Value = o.Value,
-                    NextQuestionId = o.NextQuestionId
-                }).ToList(),
-                Validation = q.Validation
+                    ["min"] = t.Bounds.Min,
+                    ["max"] = t.Bounds.Max
+                } : null,
+                Options = t.Options?.Select(o => new OptionDto
+                {
+                    Key = o,
+                    Label = o,
+                    Value = o
+                }).ToList() ?? new List<OptionDto>(),
+                Mapping = t.Mapping,
+                Comment = t.Comment
             }).ToList(),
             Outcomes = doc.Outcomes.Select(o => new OutcomeDto
             {

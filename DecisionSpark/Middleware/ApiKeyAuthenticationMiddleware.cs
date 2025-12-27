@@ -18,7 +18,8 @@ public class ApiKeyAuthenticationMiddleware
         "/health",
         "/about",
         "/admin",
-        "/"
+        "/",
+        "/api/decisionspecs"
     };
 
     public ApiKeyAuthenticationMiddleware(

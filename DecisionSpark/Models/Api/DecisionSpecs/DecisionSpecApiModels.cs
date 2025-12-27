@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace DecisionSpark.Models.Api.DecisionSpecs;
 
@@ -8,23 +9,29 @@ namespace DecisionSpark.Models.Api.DecisionSpecs;
 public class DecisionSpecCreateRequest
 {
     [Required]
+    [JsonPropertyName("spec_id")]
     public string SpecId { get; set; } = string.Empty;
 
     [Required]
     [RegularExpression(@"^\d+\.\d+\.\d+$", ErrorMessage = "Version must match format: major.minor.patch")]
+    [JsonPropertyName("version")]
     public string Version { get; set; } = string.Empty;
 
+    [JsonPropertyName("status")]
     public string Status { get; set; } = "Draft";
 
     [Required]
+    [JsonPropertyName("metadata")]
     public DecisionSpecMetadataDto Metadata { get; set; } = new();
 
     [Required]
-    [MinLength(1, ErrorMessage = "At least one question is required")]
-    public List<QuestionDto> Questions { get; set; } = new();
+    [MinLength(1, ErrorMessage = "At least one trait is required")]
+    [JsonPropertyName("traits")]
+    public List<TraitDto> Traits { get; set; } = new();
 
     [Required]
     [MinLength(1, ErrorMessage = "At least one outcome is required")]
+    [JsonPropertyName("outcomes")]
     public List<OutcomeDto> Outcomes { get; set; } = new();
 }
 
@@ -33,9 +40,16 @@ public class DecisionSpecCreateRequest
 /// </summary>
 public class DecisionSpecListResponse
 {
+    [JsonPropertyName("items")]
     public List<DecisionSpecSummaryDto> Items { get; set; } = new();
+    
+    [JsonPropertyName("total")]
     public int Total { get; set; }
+    
+    [JsonPropertyName("page")]
     public int Page { get; set; }
+    
+    [JsonPropertyName("page_size")]
     public int PageSize { get; set; }
 }
 
@@ -44,13 +58,28 @@ public class DecisionSpecListResponse
 /// </summary>
 public class DecisionSpecSummaryDto
 {
+    [JsonPropertyName("spec_id")]
     public string SpecId { get; set; } = string.Empty;
+    
+    [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
+    
+    [JsonPropertyName("status")]
     public string Status { get; set; } = string.Empty;
+    
+    [JsonPropertyName("owner")]
     public string Owner { get; set; } = string.Empty;
+    
+    [JsonPropertyName("version")]
     public string Version { get; set; } = string.Empty;
+    
+    [JsonPropertyName("updated_at")]
     public DateTimeOffset UpdatedAt { get; set; }
-    public int QuestionCount { get; set; }
+    
+    [JsonPropertyName("trait_count")]
+    public int TraitCount { get; set; }
+    
+    [JsonPropertyName("has_unverified_draft")]
     public bool HasUnverifiedDraft { get; set; }
 }
 
@@ -60,22 +89,29 @@ public class DecisionSpecSummaryDto
 public class DecisionSpecDocumentDto
 {
     [Required]
+    [JsonPropertyName("spec_id")]
     public string SpecId { get; set; } = string.Empty;
 
     [Required]
+    [JsonPropertyName("version")]
     public string Version { get; set; } = string.Empty;
 
+    [JsonPropertyName("status")]
     public string Status { get; set; } = "Draft";
 
     [Required]
+    [JsonPropertyName("metadata")]
     public DecisionSpecMetadataDto Metadata { get; set; } = new();
 
     [Required]
-    public List<QuestionDto> Questions { get; set; } = new();
+    [JsonPropertyName("traits")]
+    public List<TraitDto> Traits { get; set; } = new();
 
     [Required]
+    [JsonPropertyName("outcomes")]
     public List<OutcomeDto> Outcomes { get; set; } = new();
 
+    [JsonPropertyName("audit")]
     public List<AuditEventDto> Audit { get; set; } = new();
 }
 
@@ -85,50 +121,76 @@ public class DecisionSpecDocumentDto
 public class DecisionSpecMetadataDto
 {
     [Required]
+    [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
+    [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;
 
+    [JsonPropertyName("tags")]
     public List<string> Tags { get; set; } = new();
 }
 
 /// <summary>
-/// Question definition.
+/// Trait definition.
 /// </summary>
-public class QuestionDto
+public class TraitDto
 {
     [Required]
-    public string QuestionId { get; set; } = string.Empty;
+    [JsonPropertyName("key")]
+    public string Key { get; set; } = string.Empty;
 
     [Required]
-    public string Type { get; set; } = "SingleSelect";
+    [JsonPropertyName("answer_type")]
+    public string AnswerType { get; set; } = "choice";
 
     [Required]
-    public string Prompt { get; set; } = string.Empty;
+    [JsonPropertyName("question_text")]
+    public string QuestionText { get; set; } = string.Empty;
 
-    public string? HelpText { get; set; }
+    [JsonPropertyName("parse_hint")]
+    public string? ParseHint { get; set; }
 
+    [JsonPropertyName("required")]
     public bool Required { get; set; } = true;
 
+    [JsonPropertyName("is_pseudo_trait")]
+    public bool IsPseudoTrait { get; set; }
+
+    [JsonPropertyName("allow_multiple")]
+    public bool AllowMultiple { get; set; }
+
+    [JsonPropertyName("depends_on")]
+    public string? DependsOn { get; set; }
+
+    [JsonPropertyName("bounds")]
+    public Dictionary<string, object>? Bounds { get; set; }
+
+    [JsonPropertyName("options")]
     public List<OptionDto> Options { get; set; } = new();
 
-    public Dictionary<string, object>? Validation { get; set; }
+    [JsonPropertyName("mapping")]
+    public Dictionary<string, List<string>>? Mapping { get; set; }
+
+    [JsonPropertyName("comment")]
+    public string? Comment { get; set; }
 }
 
 /// <summary>
-/// Option for a question.
+/// Option for a trait.
 /// </summary>
 public class OptionDto
 {
     [Required]
-    public string OptionId { get; set; } = string.Empty;
+    [JsonPropertyName("key")]
+    public string Key { get; set; } = string.Empty;
 
     [Required]
+    [JsonPropertyName("label")]
     public string Label { get; set; } = string.Empty;
 
+    [JsonPropertyName("value")]
     public string Value { get; set; } = string.Empty;
-
-    public string? NextQuestionId { get; set; }
 }
 
 /// <summary>
@@ -137,22 +199,35 @@ public class OptionDto
 public class OutcomeDto
 {
     [Required]
+    [JsonPropertyName("outcome_id")]
     public string OutcomeId { get; set; } = string.Empty;
 
+    [JsonPropertyName("selection_rules")]
     public List<string> SelectionRules { get; set; } = new();
 
+    [JsonPropertyName("display_cards")]
     public List<object> DisplayCards { get; set; } = new();
 }
 
 /// <summary>
-/// Request to patch a single question.
+/// Request to patch a single trait.
 /// </summary>
-public class QuestionPatchRequest
+public class TraitPatchRequest
 {
-    public string? Prompt { get; set; }
-    public string? HelpText { get; set; }
+    [JsonPropertyName("question_text")]
+    public string? QuestionText { get; set; }
+    
+    [JsonPropertyName("parse_hint")]
+    public string? ParseHint { get; set; }
+    
+    [JsonPropertyName("options")]
     public List<OptionDto>? Options { get; set; }
-    public Dictionary<string, object>? Validation { get; set; }
+    
+    [JsonPropertyName("bounds")]
+    public Dictionary<string, object>? Bounds { get; set; }
+    
+    [JsonPropertyName("comment")]
+    public string? Comment { get; set; }
 }
 
 /// <summary>
@@ -160,7 +235,10 @@ public class QuestionPatchRequest
 /// </summary>
 public class AuditLogResponse
 {
+    [JsonPropertyName("spec_id")]
     public string SpecId { get; set; } = string.Empty;
+    
+    [JsonPropertyName("events")]
     public List<AuditEventDto> Events { get; set; } = new();
 }
 
@@ -169,11 +247,22 @@ public class AuditLogResponse
 /// </summary>
 public class AuditEventDto
 {
+    [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;
+    
+    [JsonPropertyName("action")]
     public string Action { get; set; } = string.Empty;
+    
+    [JsonPropertyName("summary")]
     public string Summary { get; set; } = string.Empty;
+    
+    [JsonPropertyName("actor")]
     public string Actor { get; set; } = string.Empty;
+    
+    [JsonPropertyName("source")]
     public string Source { get; set; } = string.Empty;
+    
+    [JsonPropertyName("created_at")]
     public DateTimeOffset CreatedAt { get; set; }
 }
 
@@ -183,10 +272,13 @@ public class AuditEventDto
 public class LlmDraftRequest
 {
     [Required]
+    [JsonPropertyName("instruction")]
     public string Instruction { get; set; } = string.Empty;
 
+    [JsonPropertyName("tone")]
     public string? Tone { get; set; }
 
+    [JsonPropertyName("seed_spec_id")]
     public string? SeedSpecId { get; set; }
 }
 
@@ -195,9 +287,16 @@ public class LlmDraftRequest
 /// </summary>
 public class LlmDraftResponse
 {
+    [JsonPropertyName("draft_id")]
     public string DraftId { get; set; } = string.Empty;
+    
+    [JsonPropertyName("status")]
     public string Status { get; set; } = "Pending";
+    
+    [JsonPropertyName("spec")]
     public DecisionSpecDocumentDto? Spec { get; set; }
+    
+    [JsonPropertyName("expires_at")]
     public DateTimeOffset ExpiresAt { get; set; }
 }
 
@@ -207,7 +306,9 @@ public class LlmDraftResponse
 public class StatusTransitionRequest
 {
     [Required]
+    [JsonPropertyName("new_status")]
     public string NewStatus { get; set; } = string.Empty;
     
+    [JsonPropertyName("comment")]
     public string? Comment { get; set; }
 }

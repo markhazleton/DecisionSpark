@@ -47,6 +47,16 @@
         </div>
     }
 
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <h5 class="alert-heading"><i class="bi bi-exclamation-circle"></i> Validation Failed</h5>
+            <p><strong>Please correct the following errors before saving:</strong></p>
+            <div asp-validation-summary="All" class="mb-0"></div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
     <form asp-action="Save" method="post" id="editForm" novalidate>
         @Html.AntiForgeryToken()
         <input type="hidden" asp-for="ETag" />
@@ -93,6 +103,26 @@
                                 <textarea asp-for="Metadata.Description" class="form-control" rows="3"
                                           placeholder="Describe the purpose of this decision spec..."></textarea>
                                 <span asp-validation-for="Metadata.Description" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-12">
+                                <label asp-for="CanonicalBaseUrl" class="form-label">Canonical Base URL</label>
+                                <input asp-for="CanonicalBaseUrl" class="form-control" 
+                                       placeholder="e.g., https://api.decisionspark.com" />
+                                <span asp-validation-for="CanonicalBaseUrl" class="text-danger"></span>
+                                <small class="form-text text-muted">Base URL for API endpoints</small>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-12">
+                                <label asp-for="SafetyPreamble" class="form-label">Safety Preamble</label>
+                                <textarea asp-for="SafetyPreamble" class="form-control" rows="2"
+                                          placeholder="e.g., Keep technical advice objective, neutral, and helpful..."></textarea>
+                                <span asp-validation-for="SafetyPreamble" class="text-danger"></span>
+                                <small class="form-text text-muted">Guidelines for response generation</small>
                             </div>
                         </div>
 
@@ -243,19 +273,85 @@
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
-                    <input type="text" name="Questions[${questionIndex}].QuestionId" class="form-control mb-2" placeholder="Question ID" required />
-                    <input type="text" name="Questions[${questionIndex}].Prompt" class="form-control mb-2" placeholder="Question prompt" required />
-                    <select name="Questions[${questionIndex}].Type" class="form-select mb-2">
-                        <option value="SingleSelect">Single Select</option>
-                        <option value="MultiSelect">Multi Select</option>
-                        <option value="Text">Text</option>
-                        <option value="Number">Number</option>
-                        <option value="Date">Date</option>
-                    </select>
-                    <input type="text" name="Questions[${questionIndex}].HelpText" class="form-control" placeholder="Help text (optional)" />
+                    
+                    <div class="mb-3">
+                        <label for="Questions_${questionIndex}__QuestionId" class="form-label">Question ID *</label>
+                        <input type="text" name="Questions[${questionIndex}].QuestionId" 
+                               id="Questions_${questionIndex}__QuestionId"
+                               class="form-control" 
+                               placeholder="e.g., Q1, question_1, user-preference" required />
+                        <small class="form-text text-muted">Unique identifier - letters, numbers, underscores, hyphens</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="Questions_${questionIndex}__Type" class="form-label">Question Type *</label>
+                        <select name="Questions[${questionIndex}].Type" 
+                                id="Questions_${questionIndex}__Type"
+                                class="form-select question-type-selector" 
+                                data-question-index="${questionIndex}"
+                                required>
+                            <option value="SingleSelect">Single Select</option>
+                            <option value="MultiSelect">Multi Select</option>
+                            <option value="Text">Text</option>
+                            <option value="Number">Number</option>
+                            <option value="Date">Date</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="Questions_${questionIndex}__Prompt" class="form-label">Question Prompt *</label>
+                        <textarea name="Questions[${questionIndex}].Prompt" 
+                                  id="Questions_${questionIndex}__Prompt"
+                                  class="form-control" 
+                                  rows="2"
+                                  placeholder="Enter the question text..." required></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="Questions_${questionIndex}__HelpText" class="form-label">Help Text</label>
+                        <input type="text" name="Questions[${questionIndex}].HelpText" 
+                               id="Questions_${questionIndex}__HelpText"
+                               class="form-control" 
+                               placeholder="Additional guidance for users (optional)" />
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="Questions[${questionIndex}].Required" 
+                               id="Questions_${questionIndex}__Required"
+                               class="form-check-input" checked value="true" />
+                        <input type="hidden" name="Questions[${questionIndex}].Required" value="false" />
+                        <label class="form-check-label" for="Questions_${questionIndex}__Required">
+                            Required question
+                        </label>
+                    </div>
+                    
+                    <div class="mb-3 options-section" id="optionsSection_${questionIndex}" 
+                         data-question-index="${questionIndex}" style="display: none;">
+                        <label class="form-label">Options *</label>
+                        <small class="form-text text-muted d-block mb-2">At least one option is required for select-type questions</small>
+                        <div id="optionsContainer_${questionIndex}">
+                            <div class="alert alert-warning" role="alert">
+                                <i class="bi bi-exclamation-triangle"></i> No options added yet. At least one option is required for select-type questions.
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addOption(${questionIndex})">
+                            <i class="bi bi-plus"></i> Add Option
+                        </button>
+                    </div>
                 </div>
             `;
             container.insertAdjacentHTML('beforeend', newQuestion);
+            
+            // Attach event listener to the new question type selector
+            const newTypeSelector = document.getElementById(`Questions_${questionIndex}__Type`);
+            if (newTypeSelector) {
+                newTypeSelector.addEventListener('change', function() {
+                    if (window.DecisionSpecsAdmin && window.DecisionSpecsAdmin.toggleOptionsSection) {
+                        window.DecisionSpecsAdmin.toggleOptionsSection(this);
+                    }
+                });
+            }
+            
             questionIndex++;
         }
 
