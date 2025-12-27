@@ -130,11 +130,11 @@ public class DecisionSpecsController : Controller
                 SafetyPreamble = doc.SafetyPreamble,
                 Metadata = new DecisionSpecMetadataViewModel
                 {
-                    Name = doc.Metadata.Name,
-                    Description = doc.Metadata.Description,
-                    Tags = doc.Metadata.Tags?.ToList() ?? new List<string>()
+                    Name = doc.Metadata?.Name ?? string.Empty,
+                    Description = doc.Metadata?.Description ?? string.Empty,
+                    Tags = doc.Metadata?.Tags?.ToList() ?? new List<string>()
                 },
-                Questions = doc.Traits.Select(t => new QuestionViewModel
+                Questions = (doc.Traits ?? new List<TraitDefinition>()).Select(t => new QuestionViewModel
                 {
                     QuestionId = t.Key,
                     Type = t.AnswerType,
@@ -171,7 +171,7 @@ public class DecisionSpecsController : Controller
                     OutcomeId = isr.OutcomeId,
                     Rule = isr.Rule
                 }).ToList() ?? new List<ImmediateSelectRuleViewModel>(),
-                Outcomes = doc.Outcomes.Select(o => new OutcomeViewModel
+                Outcomes = (doc.Outcomes ?? new List<OutcomeDefinition>()).Select(o => new OutcomeViewModel
                 {
                     OutcomeId = o.OutcomeId,
                     SelectionRules = o.SelectionRules?.ToList() ?? new List<string>(),
@@ -388,17 +388,17 @@ public class DecisionSpecsController : Controller
                 ETag = etag,
                 Metadata = new DecisionSpecMetadataViewModel
                 {
-                    Name = doc.Metadata.Name,
-                    Description = doc.Metadata.Description,
-                    Tags = doc.Metadata.Tags?.ToList() ?? new List<string>()
+                    Name = doc.Metadata?.Name ?? string.Empty,
+                    Description = doc.Metadata?.Description ?? string.Empty,
+                    Tags = doc.Metadata?.Tags?.ToList() ?? new List<string>()
                 },
-                QuestionCount = doc.Traits.Count,
-                OutcomeCount = doc.Outcomes.Count,
-                CreatedAt = doc.Metadata.CreatedAt,
-                UpdatedAt = doc.Metadata.UpdatedAt,
-                CreatedBy = doc.Metadata.CreatedBy,
-                UpdatedBy = doc.Metadata.UpdatedBy,
-                AuditHistory = auditEntries.Select(a => new AuditEventViewModel
+                QuestionCount = doc.Traits?.Count ?? 0,
+                OutcomeCount = doc.Outcomes?.Count ?? 0,
+                CreatedAt = doc.Metadata?.CreatedAt ?? DateTimeOffset.UtcNow,
+                UpdatedAt = doc.Metadata?.UpdatedAt ?? DateTimeOffset.UtcNow,
+                CreatedBy = doc.Metadata?.CreatedBy ?? string.Empty,
+                UpdatedBy = doc.Metadata?.UpdatedBy ?? string.Empty,
+                AuditHistory = (auditEntries ?? Enumerable.Empty<AuditEntry>()).Select(a => new AuditEventViewModel
                 {
                     Id = a.AuditId,
                     Action = a.Action,
@@ -600,11 +600,11 @@ public class DecisionSpecsController : Controller
             SafetyPreamble = viewModel.SafetyPreamble,
             Metadata = new DecisionSpark.Core.Models.Spec.DecisionSpecMetadata
             {
-                Name = viewModel.Metadata.Name,
-                Description = viewModel.Metadata.Description,
-                Tags = viewModel.Metadata.Tags
+                Name = viewModel.Metadata?.Name ?? string.Empty,
+                Description = viewModel.Metadata?.Description ?? string.Empty,
+                Tags = viewModel.Metadata?.Tags ?? new List<string>()
             },
-            Traits = viewModel.Questions.Select(q => new TraitDefinition
+            Traits = (viewModel.Questions ?? new List<QuestionViewModel>()).Select(q => new TraitDefinition
             {
                 Key = q.QuestionId,
                 AnswerType = q.Type,
@@ -620,25 +620,25 @@ public class DecisionSpecsController : Controller
                     Min = q.Bounds.Min ?? 0, 
                     Max = q.Bounds.Max ?? int.MaxValue 
                 } : null,
-                Options = q.Options.Select(o => o.Value).ToList(),
+                Options = q.Options?.Select(o => o.Value).ToList(),
                 Mapping = q.Mapping
             }).ToList(),
-            DerivedTraits = viewModel.DerivedTraits.Select(dt => new DerivedTraitDefinition
+            DerivedTraits = (viewModel.DerivedTraits ?? new List<DerivedTraitViewModel>()).Select(dt => new DerivedTraitDefinition
             {
                 Key = dt.Key,
                 Expression = dt.Expression
             }).ToList(),
-            ImmediateSelectIf = viewModel.ImmediateSelectRules.Select(isr => new ImmediateSelectRule
+            ImmediateSelectIf = (viewModel.ImmediateSelectRules ?? new List<ImmediateSelectRuleViewModel>()).Select(isr => new ImmediateSelectRule
             {
                 OutcomeId = isr.OutcomeId,
                 Rule = isr.Rule
             }).ToList(),
-            Outcomes = viewModel.Outcomes.Select(o => new OutcomeDefinition
+            Outcomes = (viewModel.Outcomes ?? new List<OutcomeViewModel>()).Select(o => new OutcomeDefinition
             {
                 OutcomeId = o.OutcomeId,
                 SelectionRules = o.SelectionRules,
                 CareTypeMessage = o.CareTypeMessage,
-                DisplayCards = o.DisplayCards.Select(dc => new DisplayCard
+                DisplayCards = (o.DisplayCards ?? new List<OutcomeDisplayCardViewModel>()).Select(dc => new DisplayCard
                 {
                     Title = dc.Title,
                     Subtitle = dc.Subtitle,
@@ -662,7 +662,7 @@ public class DecisionSpecsController : Controller
             {
                 Mode = viewModel.TieStrategy.Mode,
                 ClarifierMaxAttempts = viewModel.TieStrategy.ClarifierMaxAttempts,
-                PseudoTraits = viewModel.TieStrategy.PseudoTraits.Select(pt => new TraitDefinition
+                PseudoTraits = (viewModel.TieStrategy.PseudoTraits ?? new List<QuestionViewModel>()).Select(pt => new TraitDefinition
                 {
                     Key = pt.QuestionId,
                     AnswerType = pt.Type,
@@ -670,7 +670,7 @@ public class DecisionSpecsController : Controller
                     ParseHint = pt.ParseHint ?? string.Empty,
                     Required = pt.Required,
                     IsPseudoTrait = pt.IsPseudoTrait,
-                    Options = pt.Options.Select(o => o.Value).ToList()
+                    Options = pt.Options?.Select(o => o.Value).ToList()
                 }).ToList(),
                 LlmPromptTemplate = viewModel.TieStrategy.LlmPromptTemplate
             } : null,
