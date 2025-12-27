@@ -1,5 +1,11 @@
 using DecisionSpark.Middleware;
 using DecisionSpark.Core.Services;
+using DecisionSpark.Core.Models.Configuration;
+using DecisionSpark.Core.Persistence.FileStorage;
+using DecisionSpark.Core.Persistence.Repositories;
+using DecisionSpark.Core.Services.Validation;
+using FluentValidation;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Reflection;
@@ -30,11 +36,42 @@ try
 
     builder.Host.UseSerilog();
 
+    // Configure DecisionSpecs options with validation
+    builder.Services.AddOptions<DecisionSpecsOptions>()
+        .BindConfiguration(DecisionSpecsOptions.SectionName)
+        .ValidateOnStart();
+    builder.Services.AddSingleton<IValidateOptions<DecisionSpecsOptions>, DecisionSpecsOptionsValidator>();
+
     // Add services to the container - using single AddControllersWithViews call
     builder.Services.AddControllersWithViews()
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        });
+
+    // Add health checks for DecisionSpecs directory
+    builder.Services.AddHealthChecks()
+        .AddCheck("DecisionSpecs", () =>
+        {
+            var options = builder.Services.BuildServiceProvider().GetRequiredService<IOptions<DecisionSpecsOptions>>().Value;
+            var rootPath = options.RootPath;
+            
+            if (!Directory.Exists(rootPath))
+            {
+                return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy($"DecisionSpecs directory does not exist: {rootPath}");
+            }
+
+            try
+            {
+                var testFile = Path.Combine(rootPath, $".health-check-{Guid.NewGuid()}.tmp");
+                File.WriteAllText(testFile, "health check");
+                File.Delete(testFile);
+                return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("DecisionSpecs directory is writable");
+            }
+            catch (Exception ex)
+            {
+                return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy($"DecisionSpecs directory is not writable: {ex.Message}");
+            }
         });
 
     // Add Swagger/OpenAPI with custom configuration
@@ -113,6 +150,17 @@ try
         Log.Information("Configured stub question generator");
     }
 
+    // Register DecisionSpec file storage and repository services
+    builder.Services.AddSingleton<DecisionSpecFileStore>();
+    builder.Services.AddSingleton<FileSearchIndexer>();
+    builder.Services.AddSingleton<IDecisionSpecRepository, DecisionSpecRepository>();
+    
+    // Register FluentValidation validators
+    builder.Services.AddValidatorsFromAssemblyContaining<DecisionSpecValidator>();
+    
+    // Register index refresh background service
+    builder.Services.AddHostedService<IndexRefreshHostedService>();
+
     var app = builder.Build();
 
     // Log OpenAI configuration status
@@ -158,9 +206,13 @@ try
     app.MapControllerRoute(
         name: "default",
         pattern: "{controller=Home}/{action=Index}/{id?}");
+    
+    // Map health check endpoints
+    app.MapHealthChecks("/health");
 
     Log.Information("DecisionSpark API starting on {Environment}", app.Environment.EnvironmentName);
     Log.Information("Swagger UI available at: /swagger");
+    Log.Information("Health check available at: /health");
 
     await app.RunAsync();
 }

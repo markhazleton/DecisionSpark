@@ -19,7 +19,7 @@
   "DecisionEngine": {
     "ConfigPath": "C:\\websites\\DecisionSpark\\configurations\\DecisionSpecs",
     "DefaultSpecId": "TECH_STACK_ADVISOR_V1",
-    "ApiKey": "dev-api-key-change-in-production"
+    "ApiKey": "change-this-in-production"
   },
   "ConversationStorage": {
     "Path": "C:\\websites\\DecisionSpark\\conversations"
@@ -31,11 +31,11 @@
   },
   "OpenAI": {
     "Provider": "OpenAI",
-    "ApiKey": "your-openai-api-key-here",
+    "ApiKey": "production-key-from-keyvault",
     "Model": "gpt-4",
     "MaxTokens": 500,
     "Temperature": 0.7,
-    "EnableFallback": true,
+    "EnableFallback": false,
     "TimeoutSeconds": 30
   },
   "AllowedHosts": "*"

@@ -1,31 +1,31 @@
 {
   "Logging": {
     "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
+      "Default": "Debug",
+      "Microsoft.AspNetCore": "Information"
     }
   },
   "Serilog": {
     "MinimumLevel": {
-      "Default": "Information",
+      "Default": "Debug",
       "Override": {
-        "Microsoft": "Warning",
+        "Microsoft": "Information",
         "Microsoft.AspNetCore": "Warning",
         "System": "Warning"
       }
     },
-    "LogDirectory": "C:\\websites\\DecisionSpark\\logs"
+    "LogDirectory": "./logs"
   },
   "DecisionEngine": {
-    "ConfigPath": "C:\\websites\\DecisionSpark\\configurations\\DecisionSpecs",
+    "ConfigPath": "./Config/DecisionSpecs",
     "DefaultSpecId": "TECH_STACK_ADVISOR_V1",
     "ApiKey": "dev-api-key-change-in-production"
   },
   "ConversationStorage": {
-    "Path": "C:\\websites\\DecisionSpark\\conversations"
+    "Path": "./conversations"
   },
   "DecisionSpecs": {
-    "RootPath": "C:\\websites\\DecisionSpark\\DecisionSpecs",
+    "RootPath": "./Config/DecisionSpecs",
     "SoftDeleteRetentionDays": 30,
     "IndexFileName": "DecisionSpecIndex.json"
   },
