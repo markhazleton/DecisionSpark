@@ -1,0 +1,441 @@
+openapi: 3.0.3
+info:
+  title: DecisionSpecs Management API
+  version: 0.1.0
+  description: >-
+    Authenticated CRUD + LLM drafting endpoints for DecisionSpec documents,
+    including partial updates and full-document retrieval.
+servers:
+  - url: https://{host}/api
+    variables:
+      host:
+        default: localhost:5001
+security:
+  - ApiKeyAuth: []
+tags:
+  - name: DecisionSpecs
+  - name: Drafts
+paths:
+  /decisionspecs:
+    get:
+      tags: [DecisionSpecs]
+      summary: List DecisionSpecs with optional filters
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [Draft, InReview, Published, Retired]
+        - in: query
+          name: q
+          description: Free text search
+          schema:
+            type: string
+        - in: query
+          name: owner
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paged list of specs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionSpecListResponse'
+    post:
+      tags: [DecisionSpecs]
+      summary: Create a new DecisionSpec
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionSpecCreateRequest'
+      responses:
+        '201':
+          description: Created
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionSpecDocument'
+  /decisionspecs/{specId}:
+    get:
+      tags: [DecisionSpecs]
+      summary: Retrieve DecisionSpec summary
+      parameters:
+        - $ref: '#/components/parameters/SpecId'
+      responses:
+        '200':
+          description: Spec summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionSpecDocument'
+    put:
+      tags: [DecisionSpecs]
+      summary: Replace entire DecisionSpec document
+      parameters:
+        - $ref: '#/components/parameters/SpecId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionSpecDocument'
+      responses:
+        '200':
+          description: Updated spec
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionSpecDocument'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [DecisionSpecs]
+      summary: Soft-delete a DecisionSpec
+      parameters:
+        - $ref: '#/components/parameters/SpecId'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          description: Deleted
+  /decisionspecs/{specId}/full:
+    get:
+      tags: [DecisionSpecs]
+      summary: Full document optimized for runtime consumption
+      parameters:
+        - $ref: '#/components/parameters/SpecId'
+      responses:
+        '200':
+          description: Full DecisionSpec document
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionSpecDocument'
+  /decisionspecs/{specId}/questions/{questionId}:
+    patch:
+      tags: [DecisionSpecs]
+      summary: Update a single question in-place
+      parameters:
+        - $ref: '#/components/parameters/SpecId'
+        - in: path
+          name: questionId
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionPatchRequest'
+      responses:
+        '200':
+          description: Question updated
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionSpecDocument'
+        '404':
+          description: Spec or question not found
+  /decisionspecs/{specId}/restore:
+    post:
+      tags: [DecisionSpecs]
+      summary: Restore a soft-deleted DecisionSpec
+      parameters:
+        - $ref: '#/components/parameters/SpecId'
+      responses:
+        '200':
+          description: Restored spec
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionSpecDocument'
+  /decisionspecs/{specId}/audit:
+    get:
+      tags: [DecisionSpecs]
+      summary: Fetch audit history
+      parameters:
+        - $ref: '#/components/parameters/SpecId'
+      responses:
+        '200':
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogResponse'
+  /decisionspecs/llm-drafts:
+    post:
+      tags: [Drafts]
+      summary: Request an LLM-generated draft from a short instruction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmDraftRequest'
+      responses:
+        '202':
+          description: Draft queued/created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmDraftResponse'
+  /decisionspecs/llm-drafts/{draftId}:
+    get:
+      tags: [Drafts]
+      summary: Retrieve a previously generated draft
+      parameters:
+        - in: path
+          name: draftId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Draft payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmDraftResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+  parameters:
+    SpecId:
+      in: path
+      name: specId
+      required: true
+      schema:
+        type: string
+    IfMatch:
+      in: header
+      name: If-Match
+      required: true
+      schema:
+        type: string
+      description: Base64-encoded row version token
+  responses:
+    Conflict:
+      description: Concurrency conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblem'
+  schemas:
+    DecisionSpecListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DecisionSpecSummary'
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+    DecisionSpecSummary:
+      type: object
+      required: [specId, name, status, updatedAt]
+      properties:
+        specId:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [Draft, InReview, Published, Retired]
+        owner:
+          type: string
+        version:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        questionCount:
+          type: integer
+        hasUnverifiedDraft:
+          type: boolean
+    DecisionSpecDocument:
+      type: object
+      required: [specId, version, metadata, questions, outcomes]
+      properties:
+        specId:
+          type: string
+        version:
+          type: string
+        status:
+          type: string
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+            tags:
+              type: array
+              items:
+                type: string
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Question'
+        outcomes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Outcome'
+        audit:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+    DecisionSpecCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/DecisionSpecDocument'
+    Question:
+      type: object
+      required: [questionId, type, prompt]
+      properties:
+        questionId:
+          type: string
+        type:
+          type: string
+          enum: [SingleSelect, MultiSelect, Text]
+        prompt:
+          type: string
+        helpText:
+          type: string
+        required:
+          type: boolean
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/Option'
+        validation:
+          type: object
+    Option:
+      type: object
+      properties:
+        optionId:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+        nextQuestionId:
+          type: string
+    Outcome:
+      type: object
+      required: [outcomeId]
+      properties:
+        outcomeId:
+          type: string
+        selectionRules:
+          type: array
+          items:
+            type: string
+        displayCards:
+          type: array
+          items:
+            type: object
+    QuestionPatchRequest:
+      type: object
+      properties:
+        prompt:
+          type: string
+        helpText:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/Option'
+        validation:
+          type: object
+    AuditLogResponse:
+      type: object
+      properties:
+        specId:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+    AuditEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+        summary:
+          type: string
+        actor:
+          type: string
+        source:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    LlmDraftRequest:
+      type: object
+      required: [instruction]
+      properties:
+        instruction:
+          type: string
+        tone:
+          type: string
+          description: Optional hint for style
+        seedSpecId:
+          type: string
+          description: Optional spec to clone before editing
+    LlmDraftResponse:
+      type: object
+      properties:
+        draftId:
+          type: string
+        status:
+          type: string
+          enum: [Pending, Completed, Rejected]
+        spec:
+          $ref: '#/components/schemas/DecisionSpecDocument'
+        expiresAt:
+          type: string
+          format: date-time
+    ValidationProblem:
+      type: object
+      properties:
+        title:
+          type: string
+        status:
+          type: integer
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
