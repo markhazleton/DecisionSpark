@@ -16,15 +16,18 @@ public class DecisionSpecsApiController : ControllerBase
 {
     private readonly IDecisionSpecRepository _repository;
     private readonly TraitPatchService _traitPatchService;
+    private readonly DecisionSpecDraftService? _draftService;
     private readonly ILogger<DecisionSpecsApiController> _logger;
 
     public DecisionSpecsApiController(
         IDecisionSpecRepository repository,
         TraitPatchService traitPatchService,
-        ILogger<DecisionSpecsApiController> logger)
+        ILogger<DecisionSpecsApiController> logger,
+        DecisionSpecDraftService? draftService = null)
     {
         _repository = repository;
         _traitPatchService = traitPatchService;
+        _draftService = draftService;
         _logger = logger;
     }
 
@@ -631,4 +634,110 @@ public class DecisionSpecsApiController : ControllerBase
             }).ToList()
         };
     }
+
+    #region LLM Draft Endpoints
+
+    /// <summary>
+    /// Generates a DecisionSpec draft from a natural language instruction using LLM.
+    /// </summary>
+    [HttpPost("llm-drafts")]
+    [ProducesResponseType(typeof(LlmDraftResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Microsoft.AspNetCore.Mvc.ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<LlmDraftResponse>> GenerateDraft(
+        [FromBody] LlmDraftRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (_draftService == null)
+        {
+            _logger.LogWarning("LLM draft service not configured");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, 
+                new { error = "LLM draft service is not available" });
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Instruction))
+        {
+            ModelState.AddModelError(nameof(request.Instruction), "Instruction is required");
+            return BadRequest(ModelState);
+        }
+
+        if (request.Instruction.Length > 2000)
+        {
+            ModelState.AddModelError(nameof(request.Instruction), "Instruction must be 2000 characters or less");
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            var (draft, draftId) = await _draftService.GenerateDraftAsync(request.Instruction, cancellationToken);
+
+            _logger.LogInformation("Generated LLM draft {DraftId} from instruction", draftId);
+
+            var response = new LlmDraftResponse
+            {
+                DraftId = draftId,
+                Spec = MapToDocumentDto(draft),
+                Status = "Ready",
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(7)
+            };
+
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "Failed to generate LLM draft");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, 
+                new { error = ex.Message, details = "The LLM service may be unavailable or rate-limited. Please try again later." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error generating LLM draft");
+            return StatusCode(StatusCodes.Status500InternalServerError, 
+                new { error = "An unexpected error occurred while generating the draft" });
+        }
+    }
+
+    /// <summary>
+    /// Retrieves a previously generated draft by ID.
+    /// </summary>
+    [HttpGet("llm-drafts/{draftId}")]
+    [ProducesResponseType(typeof(DecisionSpecDocumentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<DecisionSpecDocumentDto>> GetDraft(
+        string draftId,
+        CancellationToken cancellationToken = default)
+    {
+        if (_draftService == null)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, 
+                new { error = "LLM draft service is not available" });
+        }
+
+        try
+        {
+            var draft = await _draftService.GetDraftAsync(draftId, cancellationToken);
+
+            if (draft == null)
+            {
+                return NotFound(new { error = $"Draft '{draftId}' not found" });
+            }
+
+            var dto = MapToDocumentDto(draft);
+            return Ok(dto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving draft {DraftId}", draftId);
+            return StatusCode(StatusCodes.Status500InternalServerError, 
+                new { error = "An error occurred while retrieving the draft" });
+        }
+    }
+
+    #endregion
 }

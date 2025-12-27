@@ -16,6 +16,9 @@
             <a href="@Url.Action("Create")" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> Create New Spec
             </a>
+            <button type="button" class="btn btn-success ms-2" data-bs-toggle="modal" data-bs-target="#llmAssistModal">
+                <i class="bi bi-magic"></i> LLM Create
+            </button>
         </div>
     </div>
 
@@ -208,6 +211,9 @@
         </div>
     }
 </div>
+
+<!-- Include LLM Assist Modal -->
+<partial name="_LlmAssistModal" />
 
 @section Scripts {
     <script>

@@ -179,6 +179,20 @@ try
     builder.Services.AddSingleton<IDecisionSpecRepository, DecisionSpecRepository>();
     builder.Services.AddScoped<TraitPatchService>();
     
+    // Register DecisionSpec Draft Service (LLM-assisted spec generation)
+    builder.Services.AddSingleton<DecisionSpecDraftService>(sp =>
+    {
+        var openAIService = sp.GetRequiredService<IOpenAIService>();
+        var repository = sp.GetRequiredService<IDecisionSpecRepository>();
+        var validator = sp.GetRequiredService<IValidator<DecisionSpark.Core.Models.Spec.DecisionSpecDocument>>();
+        var logger = sp.GetRequiredService<ILogger<DecisionSpecDraftService>>();
+        var options = sp.GetRequiredService<IOptions<DecisionSpecsOptions>>().Value;
+        
+        var draftsPath = Path.Combine(options.RootPath, "drafts");
+        
+        return new DecisionSpecDraftService(openAIService, repository, validator, logger, draftsPath);
+    });
+    
     // Register FluentValidation validators
     builder.Services.AddValidatorsFromAssemblyContaining<DecisionSpecValidator>();
     builder.Services.AddValidatorsFromAssemblyContaining<DecisionSpark.Areas.Admin.ViewModels.DecisionSpecs.DecisionSpecEditViewModelValidator>();
