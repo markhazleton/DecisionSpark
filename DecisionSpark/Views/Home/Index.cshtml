@@ -390,7 +390,7 @@ border-radius: 10px;
         <nav class="navbar navbar-expand-lg">
             <div class="container-fluid">
                 <a class="navbar-brand" href="/">
-                    <i class="bi bi-chat-dots-fill"></i> DecisionSpark
+                    <i class="bi bi-diagram-3-fill"></i> DecisionSpark
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                     <span class="navbar-toggler-icon"></span>
@@ -399,22 +399,34 @@ border-radius: 10px;
                     <ul class="navbar-nav ms-auto">
                         <li class="nav-item">
                             <a class="nav-link active" href="/">
-                                <i class="bi bi-house-fill"></i> Home
+                                <i class="bi bi-house-door"></i> Home
                             </a>
                         </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-gear"></i> Admin
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="adminDropdown">
+                                <li><a class="dropdown-item" href="/Admin/DecisionSpecs">
+                                    <i class="bi bi-diagram-3"></i> Manage Specs
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="/Admin/DecisionSpecs/Create">
+                                    <i class="bi bi-plus-circle"></i> Create New Spec
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#llmAssistModal">
+                                    <i class="bi bi-magic"></i> LLM Create Spec
+                                </a></li>
+                            </ul>
+                        </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/Admin/DecisionSpecs">
-                                <i class="bi bi-diagram-3"></i> Admin
+                            <a class="nav-link" href="/swagger">
+                                <i class="bi bi-file-code"></i> API
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="/about">
-                                <i class="bi bi-book-fill"></i> API Docs
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/swagger" target="_blank">
-                                <i class="bi bi-code-square"></i> Swagger
+                                <i class="bi bi-info-circle"></i> About
                             </a>
                         </li>
                     </ul>
