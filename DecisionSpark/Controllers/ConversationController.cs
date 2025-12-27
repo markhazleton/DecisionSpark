@@ -163,7 +163,7 @@ public class ConversationController : ControllerBase
             QuestionGenerationResult? questionResult = null;
             if (evaluation.NextTraitDefinition != null)
             {
-                questionResult = await _questionGenerator.GenerateQuestionWithOptionsAsync(spec, evaluation.NextTraitDefinition);
+                questionResult = await _questionGenerator.GenerateQuestionWithOptionsAsync(spec, evaluation.NextTraitDefinition, 0, session.KnownTraits);
                 session.AwaitingTraitKey = evaluation.NextTraitKey;
             }
 
@@ -278,7 +278,7 @@ public class ConversationController : ControllerBase
             var currentQuestionType = _questionPresentationDecider.DecideQuestionType(traitDef, session);
             
             // Generate question to get available options for validation
-            var currentQuestionResult = await _questionGenerator.GenerateQuestionWithOptionsAsync(spec, traitDef, session.RetryAttempt);
+            var currentQuestionResult = await _questionGenerator.GenerateQuestionWithOptionsAsync(spec, traitDef, session.RetryAttempt, session.KnownTraits);
             
             // Normalize user selection (structured options override free text per FR-024a)
             var normalizedSelection = _userSelectionService.NormalizeSelection(
@@ -331,7 +331,7 @@ public class ConversationController : ControllerBase
                 var questionType = _questionPresentationDecider.DecideQuestionType(traitDef, session);
                 await _sessionStore.SaveAsync(session);
 
-                var errorQuestionResult = await _questionGenerator.GenerateQuestionWithOptionsAsync(spec, traitDef, session.RetryAttempt);
+                var errorQuestionResult = await _questionGenerator.GenerateQuestionWithOptionsAsync(spec, traitDef, session.RetryAttempt, session.KnownTraits);
 
                 // Log telemetry for failed attempt
                 var latency = (DateTime.UtcNow - startTime).TotalMilliseconds;
@@ -379,7 +379,7 @@ public class ConversationController : ControllerBase
             QuestionGenerationResult? questionResult = null;
             if (evaluation.NextTraitDefinition != null)
             {
-                questionResult = await _questionGenerator.GenerateQuestionWithOptionsAsync(spec, evaluation.NextTraitDefinition);
+                questionResult = await _questionGenerator.GenerateQuestionWithOptionsAsync(spec, evaluation.NextTraitDefinition, 0, session.KnownTraits);
                 session.AwaitingTraitKey = evaluation.NextTraitKey;
             }
             else
@@ -423,6 +423,29 @@ public class ConversationController : ControllerBase
     /// </summary>
     private TraitDefinition? FindTraitDefinition(DecisionSpec spec, string traitKey)
     {
+        // Handle dynamic LLM clarifier traits
+        if (traitKey.StartsWith("llm_clarifier_"))
+        {
+            // Try to find the trait in the session's known traits if it was already answered
+            // But here we need the definition to validate the answer.
+            // Since we don't persist the dynamic definition, we recreate a permissive one.
+            // Ideally, we should persist the dynamic definition in the session.
+            
+            return new TraitDefinition
+            {
+                Key = traitKey,
+                QuestionText = "Dynamic Clarification",
+                AnswerType = "string", // Default to string, but will be overridden by specific logic if needed
+                ParseHint = "User's preference to resolve tie",
+                Required = false,
+                IsPseudoTrait = true,
+                // We don't have the options here, but the parser will handle "enum" type
+                // by accepting any value if options are null/empty, or we can rely on
+                // the LLM parser to validate against the question context if we had it.
+                // For now, we allow free text parsing for this dynamic trait.
+            };
+        }
+
         // First check regular traits
         var trait = spec.Traits.FirstOrDefault(t => t.Key == traitKey);
         if (trait != null)

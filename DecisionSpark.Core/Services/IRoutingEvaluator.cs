@@ -24,6 +24,28 @@ public class RoutingEvaluator : IRoutingEvaluator
 
     public async Task<EvaluationResult> EvaluateAsync(DecisionSpec spec, Dictionary<string, object> knownTraits)
     {
+        var result = await EvaluateInternalAsync(spec, knownTraits);
+
+        if (result.IsComplete && result.Outcome != null && string.IsNullOrEmpty(result.FinalSummary))
+        {
+            if (_openAIService.IsAvailable())
+            {
+                try 
+                {
+                    result.FinalSummary = await GenerateOutcomeSummaryAsync(spec, result.Outcome, knownTraits);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to generate final summary");
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private async Task<EvaluationResult> EvaluateInternalAsync(DecisionSpec spec, Dictionary<string, object> knownTraits)
+    {
         _logger.LogDebug("Evaluating with {TraitCount} known traits", knownTraits.Count);
 
         // Compute derived traits
@@ -122,6 +144,30 @@ public class RoutingEvaluator : IRoutingEvaluator
             };
         }
 
+        // Check if we have an answer to a previous LLM clarifier
+        var llmAnswerKey = knownTraits.Keys.FirstOrDefault(k => k.StartsWith("llm_clarifier_"));
+        if (llmAnswerKey != null && knownTraits.TryGetValue(llmAnswerKey, out var answerObj))
+        {
+            var answerText = answerObj?.ToString();
+            if (!string.IsNullOrWhiteSpace(answerText))
+            {
+                _logger.LogInformation("Found answer to LLM clarifier: {Answer}", answerText);
+                
+                // Use LLM to pick the winner based on the answer
+                var (winner, summary) = await PickWinnerWithLLMAsync(spec, tiedOutcomes, answerText, knownTraits);
+                if (winner != null)
+                {
+                    return new EvaluationResult
+                    {
+                        IsComplete = true,
+                        Outcome = winner,
+                        ResolutionMode = "LLM_RESOLVED",
+                        FinalSummary = summary
+                    };
+                }
+            }
+        }
+
         // Check if we should ask a pseudo-trait question
         var pseudoTrait = FindNextPseudoTrait(spec, knownTraits);
         if (pseudoTrait != null)
@@ -141,19 +187,21 @@ public class RoutingEvaluator : IRoutingEvaluator
         // Try LLM-generated clarifying question
         if (_openAIService.IsAvailable())
         {
-            var clarifyingQuestion = await GenerateClarifyingQuestionAsync(spec, tiedOutcomes);
-            if (!string.IsNullOrEmpty(clarifyingQuestion))
+            var clarifierResult = await GenerateClarifyingQuestionAsync(spec, tiedOutcomes, knownTraits);
+            if (clarifierResult != null && !string.IsNullOrEmpty(clarifierResult.QuestionText))
             {
                 _logger.LogInformation("Generated LLM clarifying question for tie");
                 // Create a dynamic pseudo-trait for this clarifier
                 var dynamicTrait = new TraitDefinition
                 {
                     Key = $"llm_clarifier_{Guid.NewGuid():N}",
-                    QuestionText = clarifyingQuestion,
-                    AnswerType = "enum",
+                    QuestionText = clarifierResult.QuestionText,
+                    AnswerType = clarifierResult.QuestionType,
                     ParseHint = "User's preference to resolve tie",
                     Required = false,
-                    IsPseudoTrait = true
+                    IsPseudoTrait = true,
+                    Options = clarifierResult.Options,
+                    AllowMultiple = clarifierResult.QuestionType == "enum_list"
                 };
 
                 return new EvaluationResult
@@ -194,25 +242,193 @@ public class RoutingEvaluator : IRoutingEvaluator
         return null;
     }
 
-    private async Task<string?> GenerateClarifyingQuestionAsync(
+    private async Task<(OutcomeDefinition? Outcome, string? Summary)> PickWinnerWithLLMAsync(
         DecisionSpec spec,
-        List<OutcomeDefinition> tiedOutcomes)
+        List<OutcomeDefinition> tiedOutcomes,
+        string userAnswer,
+        Dictionary<string, object> knownTraits)
     {
         try
         {
             var outcomeSummaries = BuildOutcomeSummaries(tiedOutcomes);
+            var knownTraitsSummary = BuildKnownTraitsSummary(knownTraits);
+            
+            var systemPrompt = $@"You are a decision helper.
+Safety Guidelines: {spec.SafetyPreamble}
+
+Context:
+The user has provided the following information:
+{knownTraitsSummary}
+
+Your task: 
+1. Select the best outcome from the candidates based on the user's preference and known traits.
+2. Provide a short summary explaining why this outcome was chosen, referencing the user's specific traits (e.g., group size, ages, preferences).
+
+Format your response exactly as:
+WINNER: [OutcomeId]
+SUMMARY: [Your explanation]
+
+If none match well, return 'WINNER: NONE'.";
+
+            var userPrompt = $@"Candidate Outcomes:
+{outcomeSummaries}
+
+User Preference to Clarifying Question: ""{userAnswer}""
+
+Which outcome ID is the best match and why?";
+
+            var request = new OpenAICompletionRequest
+            {
+                SystemPrompt = systemPrompt,
+                UserPrompt = userPrompt,
+                MaxTokens = 300,
+                Temperature = 0.3f
+            };
+
+            _logger.LogDebug("Requesting OpenAI to pick winner from tie");
+
+            var response = await _openAIService.GetCompletionAsync(request);
+
+            if (response.Success && !string.IsNullOrWhiteSpace(response.Content))
+            {
+                var content = response.Content.Trim();
+                string winnerId = "NONE";
+                string summary = "";
+
+                var lines = content.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in lines)
+                {
+                    if (line.StartsWith("WINNER:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        winnerId = line.Substring(7).Trim();
+                    }
+                    else if (line.StartsWith("SUMMARY:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        summary = line.Substring(8).Trim();
+                    }
+                    else if (!string.IsNullOrWhiteSpace(summary))
+                    {
+                        // Append multi-line summary
+                        summary += " " + line.Trim();
+                    }
+                }
+
+                var winner = tiedOutcomes.FirstOrDefault(o => o.OutcomeId.Equals(winnerId, StringComparison.OrdinalIgnoreCase));
+                
+                if (winner != null)
+                {
+                    _logger.LogInformation("LLM picked winner: {OutcomeId}", winner.OutcomeId);
+                    return (winner, summary);
+                }
+                
+                _logger.LogWarning("LLM returned invalid outcome ID: {Id}", winnerId);
+            }
+            
+            return (null, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error picking winner with LLM");
+            return (null, null);
+        }
+    }
+
+    private async Task<string> GenerateOutcomeSummaryAsync(
+        DecisionSpec spec,
+        OutcomeDefinition outcome,
+        Dictionary<string, object> knownTraits)
+    {
+        try
+        {
+            var knownTraitsSummary = BuildKnownTraitsSummary(knownTraits);
+            
+            var systemPrompt = $@"You are a decision helper.
+Safety Guidelines: {spec.SafetyPreamble}
+
+Context:
+The user has provided the following information:
+{knownTraitsSummary}
+
+Your task: 
+Provide a short, friendly summary explaining why the selected outcome is the best match for the user, referencing their specific traits (e.g., group size, ages, preferences).
+
+Selected Outcome:
+{outcome.OutcomeId}: {outcome.CareTypeMessage}
+
+Format your response as a single paragraph.";
+
+            var userPrompt = "Please explain why this recommendation is a good fit.";
+
+            var request = new OpenAICompletionRequest
+            {
+                SystemPrompt = systemPrompt,
+                UserPrompt = userPrompt,
+                MaxTokens = 200,
+                Temperature = 0.5f
+            };
+
+            _logger.LogDebug("Requesting OpenAI to generate outcome summary");
+
+            var response = await _openAIService.GetCompletionAsync(request);
+
+            if (response.Success && !string.IsNullOrWhiteSpace(response.Content))
+            {
+                return response.Content.Trim();
+            }
+            
+            return "Based on your responses, this is the best recommendation.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating outcome summary");
+            return "Based on your responses, this is the best recommendation.";
+        }
+    }
+
+    private class ClarifierResult
+    {
+        public string QuestionText { get; set; } = string.Empty;
+        public List<string> Options { get; set; } = new();
+        public string QuestionType { get; set; } = "enum"; // Default to single select
+    }
+
+    private async Task<ClarifierResult?> GenerateClarifyingQuestionAsync(
+        DecisionSpec spec,
+        List<OutcomeDefinition> tiedOutcomes,
+        Dictionary<string, object> knownTraits)
+    {
+        try
+        {
+            var outcomeSummaries = BuildOutcomeSummaries(tiedOutcomes);
+            var knownTraitsSummary = BuildKnownTraitsSummary(knownTraits);
             
             var systemPrompt = $@"You are a helpful assistant that generates clarifying questions for a decision-making system.
 
 Safety Guidelines: {spec.SafetyPreamble}
 
-Your task: Generate ONE clear, neutral question that will help distinguish between the provided outcome options.
-The question should be easy to understand and help the user make a choice.
+Context:
+The user has already provided the following information:
+{knownTraitsSummary}
 
-Return ONLY the question text, nothing else.";
+Your task: 
+1. Generate ONE clear, neutral question that will help distinguish between the provided outcome options.
+2. Decide the best format for the question:
+   - 'text': Open-ended free text (use when specific details are needed)
+   - 'enum': Single selection from options (use when choices are mutually exclusive)
+   - 'enum_list': Multiple selection from options (use when multiple choices are valid)
+3. If using 'enum' or 'enum_list', provide 2-5 short, distinct options.
+
+Format your response exactly as:
+QUESTION: [The question text]
+TYPE: [text | enum | enum_list]
+OPTIONS: [Option 1], [Option 2], [Option 3] (Leave empty if TYPE is text)
+
+- Do NOT ask for information that is already known.
+- The question should be easy to understand.
+- Options should be short phrases (1-3 words).";
 
             var userPrompt = spec.TieStrategy?.LlmPromptTemplate ?? 
-                "Given candidate outcomes: {{summaries}} ask ONE neutral question to distinguish them. Output only the question.";
+                "Given candidate outcomes: {{summaries}} ask ONE neutral question to distinguish them. Output the question, type, and options.";
             
             userPrompt = userPrompt.Replace("{{summaries}}", outcomeSummaries);
 
@@ -220,7 +436,7 @@ Return ONLY the question text, nothing else.";
             {
                 SystemPrompt = systemPrompt,
                 UserPrompt = userPrompt,
-                MaxTokens = 150,
+                MaxTokens = 250,
                 Temperature = 0.7f
             };
 
@@ -230,7 +446,46 @@ Return ONLY the question text, nothing else.";
 
             if (response.Success && !string.IsNullOrWhiteSpace(response.Content))
             {
-                return response.Content.Trim();
+                var content = response.Content.Trim();
+                var result = new ClarifierResult();
+                
+                // Parse the response
+                var lines = content.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in lines)
+                {
+                    if (line.StartsWith("QUESTION:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        result.QuestionText = line.Substring(9).Trim();
+                    }
+                    else if (line.StartsWith("TYPE:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var type = line.Substring(5).Trim().ToLower();
+                        if (type == "text" || type == "enum" || type == "enum_list")
+                        {
+                            result.QuestionType = type;
+                        }
+                    }
+                    else if (line.StartsWith("OPTIONS:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var optionsText = line.Substring(8).Trim();
+                        if (!string.IsNullOrWhiteSpace(optionsText) && !optionsText.Equals("None", StringComparison.OrdinalIgnoreCase))
+                        {
+                            result.Options = optionsText.Split(',')
+                                .Select(o => o.Trim())
+                                .Where(o => !string.IsNullOrWhiteSpace(o))
+                                .ToList();
+                        }
+                    }
+                }
+
+                // Fallback if parsing failed but we have content
+                if (string.IsNullOrEmpty(result.QuestionText) && !content.Contains("QUESTION:"))
+                {
+                    result.QuestionText = content;
+                    result.QuestionType = "text"; // Default to text if format not followed
+                }
+
+                return result;
             }
 
             _logger.LogWarning("OpenAI failed to generate clarifying question: {Error}", response.ErrorMessage);
@@ -241,6 +496,34 @@ Return ONLY the question text, nothing else.";
             _logger.LogError(ex, "Error generating clarifying question");
             return null;
         }
+    }
+
+    private string BuildKnownTraitsSummary(Dictionary<string, object> knownTraits)
+    {
+        if (knownTraits == null || knownTraits.Count == 0) return "None";
+        
+        var sb = new StringBuilder();
+        foreach (var kvp in knownTraits)
+        {
+            if (kvp.Key.StartsWith("llm_clarifier_")) continue;
+
+            string valueStr;
+            if (kvp.Value is List<int> intList)
+                valueStr = string.Join(", ", intList);
+            else if (kvp.Value is List<string> strList)
+                valueStr = string.Join(", ", strList);
+            else if (kvp.Value is System.Collections.IEnumerable && !(kvp.Value is string))
+            {
+                var items = new List<string>();
+                foreach (var item in (System.Collections.IEnumerable)kvp.Value) items.Add(item?.ToString() ?? "");
+                valueStr = string.Join(", ", items);
+            }
+            else
+                valueStr = kvp.Value?.ToString() ?? "null";
+
+            sb.AppendLine($"- {kvp.Key}: {valueStr}");
+        }
+        return sb.ToString();
     }
 
     private string BuildOutcomeSummaries(List<OutcomeDefinition> outcomes)

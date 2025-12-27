@@ -5,8 +5,8 @@ namespace DecisionSpark.Core.Services;
 
 public interface IQuestionGenerator
 {
-    Task<string> GenerateQuestionAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0);
-    Task<QuestionGenerationResult> GenerateQuestionWithOptionsAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0);
+    Task<string> GenerateQuestionAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0, Dictionary<string, object>? knownTraits = null);
+    Task<QuestionGenerationResult> GenerateQuestionWithOptionsAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0, Dictionary<string, object>? knownTraits = null);
 }
 
 public class QuestionGenerationResult
@@ -25,7 +25,7 @@ public class StubQuestionGenerator : IQuestionGenerator
  _logger = logger;
   }
 
-    public Task<string> GenerateQuestionAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0)
+    public Task<string> GenerateQuestionAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0, Dictionary<string, object>? knownTraits = null)
     {
   _logger.LogDebug("Generating question for trait {TraitKey}, retry attempt {Attempt}", trait.Key, retryAttempt);
 
@@ -41,7 +41,7 @@ public class StubQuestionGenerator : IQuestionGenerator
         return Task.FromResult(question);
     }
 
-    public Task<QuestionGenerationResult> GenerateQuestionWithOptionsAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0)
+    public Task<QuestionGenerationResult> GenerateQuestionWithOptionsAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0, Dictionary<string, object>? knownTraits = null)
     {
         var result = new QuestionGenerationResult
         {

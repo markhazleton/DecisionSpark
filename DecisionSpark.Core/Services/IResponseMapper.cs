@@ -44,62 +44,71 @@ public class ResponseMapper : IResponseMapper
 
     public StartResponse MapToStartResponse(EvaluationResult evaluation, DecisionSession session, DecisionSpec spec, QuestionGenerationResult? questionResult)
     {
- var response = new StartResponse();
+        var response = new StartResponse();
 
-  if (evaluation.IsComplete && evaluation.Outcome != null)
+        if (evaluation.IsComplete && evaluation.Outcome != null)
         {
-     MapCompletionResponse(response, evaluation.Outcome, spec);
+            MapCompletionResponse(response, evaluation.Outcome, spec, evaluation.FinalSummary);
         }
-   else if (evaluation.NextTraitKey != null && evaluation.NextTraitDefinition != null)
-     {
-   MapQuestionResponse(response, evaluation.NextTraitDefinition, spec, questionResult, session);
-response.NextUrl = $"{GetBaseUrl(spec)}/conversation/{session.SessionId}/next";
-}
+        else if (evaluation.NextTraitKey != null && evaluation.NextTraitDefinition != null)
+        {
+            MapQuestionResponse(response, evaluation.NextTraitDefinition, spec, questionResult, session);
+            response.NextUrl = $"{GetBaseUrl(spec)}/conversation/{session.SessionId}/next";
+        }
         else if (evaluation.RequiresClarifier)
         {
-       // Tie detected - will be handled by clarifier flow
-    response.Texts.Add("I need one more detail to make the best recommendation.");
-}
+            // Tie detected - will be handled by clarifier flow
+            response.Texts.Add("I need one more detail to make the best recommendation.");
+        }
 
-   return response;
+        return response;
     }
 
     public NextResponse MapToNextResponse(EvaluationResult evaluation, DecisionSession session, DecisionSpec spec, QuestionGenerationResult? questionResult, int answeredTraitCount)
     {
-  var response = new NextResponse();
+        var response = new NextResponse();
 
-   if (evaluation.IsComplete && evaluation.Outcome != null)
-     {
-   MapCompletionResponse(response, evaluation.Outcome, spec);
-     }
-   else if (evaluation.NextTraitKey != null && evaluation.NextTraitDefinition != null)
-   {
-     MapQuestionResponse(response, evaluation.NextTraitDefinition, spec, questionResult, session);
-    response.NextUrl = $"{GetBaseUrl(spec)}/conversation/{session.SessionId}/next";
-      
-       if (answeredTraitCount > 0)
+        if (evaluation.IsComplete && evaluation.Outcome != null)
+        {
+            MapCompletionResponse(response, evaluation.Outcome, spec, evaluation.FinalSummary);
+        }
+        else if (evaluation.NextTraitKey != null && evaluation.NextTraitDefinition != null)
+        {
+            MapQuestionResponse(response, evaluation.NextTraitDefinition, spec, questionResult, session);
+            response.NextUrl = $"{GetBaseUrl(spec)}/conversation/{session.SessionId}/next";
+            
+            if (answeredTraitCount > 0)
             {
-  response.PrevUrl = $"{GetBaseUrl(spec)}/conversation/{session.SessionId}/prev";
-   }
-}
- else if (evaluation.RequiresClarifier)
- {
-  response.Texts.Add("I need one more detail to make the best recommendation.");
-   }
+                response.PrevUrl = $"{GetBaseUrl(spec)}/conversation/{session.SessionId}/prev";
+            }
+        }
+        else if (evaluation.RequiresClarifier)
+        {
+            response.Texts.Add("I need one more detail to make the best recommendation.");
+        }
 
- return response;
+        return response;
     }
 
-    private void MapCompletionResponse(dynamic response, OutcomeDefinition outcome, DecisionSpec spec)
+    private void MapCompletionResponse(dynamic response, OutcomeDefinition outcome, DecisionSpec spec, string? summary)
     {
         response.IsComplete = true;
-      response.Texts = new List<string> { "Here's what I recommend:" };
+        
+        if (!string.IsNullOrWhiteSpace(summary))
+        {
+            response.Texts = new List<string> { summary };
+        }
+        else
+        {
+            response.Texts = new List<string> { "Here's what I recommend:" };
+        }
+        
         response.DisplayCards = outcome.DisplayCards.Select(MapDisplayCard).ToList();
-    response.CareTypeMessage = outcome.CareTypeMessage;
+        response.CareTypeMessage = outcome.CareTypeMessage;
         response.FinalResult = MapFinalResult(outcome);
-response.RawResponse = outcome.FinalResult.AnalyticsResolutionCode;
+        response.RawResponse = outcome.FinalResult.AnalyticsResolutionCode;
 
-  _logger.LogInformation("Mapped completion response for outcome {OutcomeId}", outcome.OutcomeId);
+        _logger.LogInformation("Mapped completion response for outcome {OutcomeId}", outcome.OutcomeId);
     }
 
     private void MapQuestionResponse(dynamic response, TraitDefinition trait, DecisionSpec spec, QuestionGenerationResult? questionResult, DecisionSession session)

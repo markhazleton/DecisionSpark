@@ -16,12 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Config\**\*.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\DecisionSpark.Core\DecisionSpark.Core.csproj" />
   </ItemGroup>
 

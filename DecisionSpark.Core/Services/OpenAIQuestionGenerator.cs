@@ -22,7 +22,7 @@ public class OpenAIQuestionGenerator : IQuestionGenerator
         _optionIdGenerator = optionIdGenerator;
     }
 
-    public async Task<string> GenerateQuestionAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0)
+    public async Task<string> GenerateQuestionAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0, Dictionary<string, object>? knownTraits = null)
     {
         _logger.LogDebug("Generating question for trait {TraitKey}, retry attempt {Attempt}", 
             trait.Key, retryAttempt);
@@ -37,7 +37,7 @@ public class OpenAIQuestionGenerator : IQuestionGenerator
         try
         {
             var systemPrompt = BuildSystemPrompt(spec, trait, retryAttempt);
-            var userPrompt = BuildUserPrompt(trait, retryAttempt);
+            var userPrompt = BuildUserPrompt(trait, retryAttempt, knownTraits);
 
             var request = new OpenAICompletionRequest
             {
@@ -95,7 +95,7 @@ Return ONLY the question text, nothing else.";
         return systemPrompt;
     }
 
-    private string BuildUserPrompt(TraitDefinition trait, int retryAttempt)
+    private string BuildUserPrompt(TraitDefinition trait, int retryAttempt, Dictionary<string, object>? knownTraits)
     {
         var context = new
         {
@@ -104,7 +104,8 @@ Return ONLY the question text, nothing else.";
             answer_type = trait.AnswerType,
             parse_hint = trait.ParseHint,
             retry_attempt = retryAttempt,
-            options = trait.Options
+            options = trait.Options,
+            known_info = BuildKnownTraitsSummary(knownTraits)
         };
 
         if (retryAttempt > 0)
@@ -123,9 +124,36 @@ Generate a rephrased question that helps the user understand what format is need
 Base question: {trait.QuestionText}
 Context: {JsonSerializer.Serialize(context)}
 
-Make it sound friendly and easy to understand while collecting the same information.";
+Make it sound friendly and easy to understand while collecting the same information.
+Do NOT ask for information that is already known (listed in known_info).";
     }
-    public async Task<QuestionGenerationResult> GenerateQuestionWithOptionsAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0)
+
+    private string BuildKnownTraitsSummary(Dictionary<string, object>? knownTraits)
+    {
+        if (knownTraits == null || knownTraits.Count == 0) return "None";
+        
+        var summary = new Dictionary<string, string>();
+        foreach (var kvp in knownTraits)
+        {
+            if (kvp.Key.StartsWith("llm_clarifier_")) continue;
+
+            string valueStr;
+            if (kvp.Value is System.Collections.IEnumerable list && !(kvp.Value is string))
+            {
+                var items = new List<string>();
+                foreach (var item in list) items.Add(item?.ToString() ?? "");
+                valueStr = string.Join(", ", items);
+            }
+            else
+            {
+                valueStr = kvp.Value?.ToString() ?? "null";
+            }
+            summary[kvp.Key] = valueStr;
+        }
+        return JsonSerializer.Serialize(summary);
+    }
+
+    public async Task<QuestionGenerationResult> GenerateQuestionWithOptionsAsync(DecisionSpec spec, TraitDefinition trait, int retryAttempt = 0, Dictionary<string, object>? knownTraits = null)
     {
         _logger.LogDebug("Generating question with options for trait {TraitKey}, retry attempt {Attempt}", 
             trait.Key, retryAttempt);
@@ -136,7 +164,7 @@ Make it sound friendly and easy to understand while collecting the same informat
         };
 
         // Generate question text
-        result.QuestionText = await GenerateQuestionAsync(spec, trait, retryAttempt);
+        result.QuestionText = await GenerateQuestionAsync(spec, trait, retryAttempt, knownTraits);
 
         // Generate options if trait has them
         if (trait.Options != null && trait.Options.Count > 0)

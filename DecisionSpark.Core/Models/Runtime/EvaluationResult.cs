@@ -11,4 +11,5 @@ public class EvaluationResult
     public bool RequiresClarifier { get; set; }
     public List<OutcomeDefinition> TiedOutcomes { get; set; } = new();
     public string ResolutionMode { get; set; } = string.Empty;
+    public string? FinalSummary { get; set; }
 }
