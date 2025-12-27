@@ -2,7 +2,7 @@ namespace DecisionSpark.Core.Models.Spec;
 
 /// <summary>
 /// Extended DecisionSpec document structure for CRUD operations.
-/// Wraps the existing DecisionSpec model with metadata for file-based persistence.
+/// Contains questions and outcomes for simplified question-based decision trees.
 /// </summary>
 public class DecisionSpecDocument
 {
@@ -10,7 +10,8 @@ public class DecisionSpecDocument
     public string Version { get; set; } = "1.0.0";
     public string Status { get; set; } = "Draft";
     public DecisionSpecMetadata Metadata { get; set; } = new();
-    public DecisionSpec Spec { get; set; } = new();
+    public List<Question> Questions { get; set; } = new();
+    public List<Outcome> Outcomes { get; set; } = new();
 }
 
 /// <summary>

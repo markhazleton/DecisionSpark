@@ -154,6 +154,7 @@ try
     builder.Services.AddSingleton<DecisionSpecFileStore>();
     builder.Services.AddSingleton<FileSearchIndexer>();
     builder.Services.AddSingleton<IDecisionSpecRepository, DecisionSpecRepository>();
+    builder.Services.AddScoped<QuestionPatchService>();
     
     // Register FluentValidation validators
     builder.Services.AddValidatorsFromAssemblyContaining<DecisionSpecValidator>();
@@ -195,6 +196,10 @@ try
 
     app.UseHttpsRedirection();
     app.UseStaticFiles();
+    
+    // Validation error handling middleware
+    app.UseValidationProblemDetails();
+    
     app.UseRouting();
 
     // API Key Authentication - must be after UseRouting and before UseAuthorization

@@ -27,9 +27,19 @@ public class DecisionSpecValidator : AbstractValidator<DecisionSpecDocument>
             .NotNull().WithErrorCode("SPEC007").WithMessage("Metadata is required")
             .SetValidator(new MetadataValidator());
 
-        // Validate Spec property exists
-        RuleFor(x => x.Spec)
-            .NotNull().WithErrorCode("SPEC011").WithMessage("Spec is required");
+        // Validate Questions exist and are valid
+        RuleFor(x => x.Questions)
+            .NotEmpty().WithErrorCode("SPEC008").WithMessage("At least one question is required");
+
+        RuleForEach(x => x.Questions)
+            .SetValidator(new QuestionValidator());
+
+        // Validate Outcomes exist and are valid
+        RuleFor(x => x.Outcomes)
+            .NotEmpty().WithErrorCode("SPEC009").WithMessage("At least one outcome is required");
+
+        RuleForEach(x => x.Outcomes)
+            .SetValidator(new OutcomeValidator());
     }
 }
 
@@ -128,20 +138,15 @@ public class QuestionBasedSpecValidator : AbstractValidator<DecisionSpecDocument
     {
         Include(new DecisionSpecValidator());
 
-        RuleFor(x => x)
-            .Custom((doc, context) =>
-            {
-                // If the spec has questions (new format), validate them
-                var specJson = System.Text.Json.JsonSerializer.Serialize(doc.Spec);
-                if (specJson.Contains("\"Traits\"") && specJson.Contains("\"QuestionText\""))
-                {
-                    // This is the old trait-based format, no additional validation needed
-                    return;
-                }
-                
-                // For now, accept both formats - we'll add question-specific validation
-                // when implementing the question-type feature
-            });
+        RuleFor(x => x.Questions)
+            .Must(questions => questions.Select(q => q.QuestionId).Distinct().Count() == questions.Count)
+            .WithErrorCode("QSPEC001")
+            .WithMessage("Question IDs must be unique across the entire spec");
+
+        RuleFor(x => x.Outcomes)
+            .Must(outcomes => outcomes.Select(o => o.OutcomeId).Distinct().Count() == outcomes.Count)
+            .WithErrorCode("QSPEC002")
+            .WithMessage("Outcome IDs must be unique across the entire spec");
     }
 }
 

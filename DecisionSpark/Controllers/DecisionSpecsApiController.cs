@@ -1,0 +1,630 @@
+using DecisionSpark.Middleware;
+using DecisionSpark.Models.Api.DecisionSpecs;
+using DecisionSpark.Core.Models.Spec;
+using DecisionSpark.Core.Persistence.Repositories;
+using DecisionSpark.Core.Services;
+using Microsoft.AspNetCore.Mvc;
+
+namespace DecisionSpark.Controllers;
+
+/// <summary>
+/// API controller for DecisionSpec CRUD operations.
+/// </summary>
+[ApiController]
+[Route("api/decisionspecs")]
+[ServiceFilter(typeof(ApiKeyAuthenticationMiddleware))]
+public class DecisionSpecsApiController : ControllerBase
+{
+    private readonly IDecisionSpecRepository _repository;
+    private readonly QuestionPatchService _questionPatchService;
+    private readonly ILogger<DecisionSpecsApiController> _logger;
+
+    public DecisionSpecsApiController(
+        IDecisionSpecRepository repository,
+        QuestionPatchService questionPatchService,
+        ILogger<DecisionSpecsApiController> logger)
+    {
+        _repository = repository;
+        _questionPatchService = questionPatchService;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Lists DecisionSpecs with optional filters.
+    /// </summary>
+    [HttpGet]
+    [ProducesResponseType(typeof(DecisionSpecListResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<DecisionSpecListResponse>> List(
+        [FromQuery] string? status = null,
+        [FromQuery] string? owner = null,
+        [FromQuery] string? q = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var summaries = await _repository.ListAsync(status, owner, q, cancellationToken);
+        var items = summaries
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(MapToSummaryDto)
+            .ToList();
+
+        return Ok(new DecisionSpecListResponse
+        {
+            Items = items,
+            Total = summaries.Count(),
+            Page = page,
+            PageSize = pageSize
+        });
+    }
+
+    /// <summary>
+    /// Creates a new DecisionSpec.
+    /// </summary>
+    [HttpPost]
+    [ProducesResponseType(typeof(DecisionSpecDocumentDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(Microsoft.AspNetCore.Mvc.ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<DecisionSpecDocumentDto>> Create(
+        [FromBody] DecisionSpecCreateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var doc = MapToDocument(request);
+        var (created, etag) = await _repository.CreateAsync(doc, cancellationToken);
+
+        Response.Headers.Append("ETag", etag);
+        
+        var dto = MapToDocumentDto(created);
+        return CreatedAtAction(nameof(Get), new { specId = created.SpecId }, dto);
+    }
+
+    /// <summary>
+    /// Retrieves a DecisionSpec by ID.
+    /// </summary>
+    [HttpGet("{specId}")]
+    [ProducesResponseType(typeof(DecisionSpecDocumentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<DecisionSpecDocumentDto>> Get(
+        string specId,
+        [FromQuery] string? version = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _repository.GetAsync(specId, version, cancellationToken);
+        
+        if (result == null)
+        {
+            return NotFound();
+        }
+
+        var (doc, etag) = result.Value;
+        Response.Headers.Append("ETag", etag);
+
+        return Ok(MapToDocumentDto(doc));
+    }
+
+    /// <summary>
+    /// Replaces an entire DecisionSpec document.
+    /// </summary>
+    [HttpPut("{specId}")]
+    [ProducesResponseType(typeof(DecisionSpecDocumentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Microsoft.AspNetCore.Mvc.ValidationProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<DecisionSpecDocumentDto>> Update(
+        string specId,
+        [FromBody] DecisionSpecDocumentDto request,
+        [FromHeader(Name = "If-Match")] string ifMatch,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        if (string.IsNullOrWhiteSpace(ifMatch))
+        {
+            return BadRequest(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
+                new Dictionary<string, string[]>
+                {
+                    ["If-Match"] = new[] { "If-Match header is required for updates" }
+                })
+            {
+                Title = "If-Match header is required",
+                Status = 400
+            });
+        }
+
+        try
+        {
+            var doc = MapToDocument(request);
+            var result = await _repository.UpdateAsync(specId, doc, ifMatch, cancellationToken);
+
+            if (result == null)
+            {
+                return NotFound();
+            }
+
+            var (updated, etag) = result.Value;
+            Response.Headers.Append("ETag", etag);
+
+            return Ok(MapToDocumentDto(updated));
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("ETag mismatch"))
+        {
+            return Conflict(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
+                new Dictionary<string, string[]>
+                {
+                    ["ETag"] = new[] { "The DecisionSpec has been modified by another user. Please reload and try again." }
+                })
+            {
+                Title = "Concurrency conflict",
+                Status = 409
+            });
+        }
+    }
+
+    /// <summary>
+    /// Soft-deletes a DecisionSpec.
+    /// </summary>
+    [HttpDelete("{specId}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Microsoft.AspNetCore.Mvc.ValidationProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(
+        string specId,
+        [FromQuery] string version,
+        [FromHeader(Name = "If-Match")] string ifMatch,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(ifMatch))
+        {
+            return BadRequest(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
+                new Dictionary<string, string[]>
+                {
+                    ["If-Match"] = new[] { "If-Match header is required for deletions" }
+                })
+            {
+                Title = "If-Match header is required",
+                Status = 400
+            });
+        }
+
+        try
+        {
+            var success = await _repository.DeleteAsync(specId, version, ifMatch, cancellationToken);
+            
+            if (!success)
+            {
+                return NotFound();
+            }
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("ETag mismatch"))
+        {
+            return Conflict(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
+                new Dictionary<string, string[]>
+                {
+                    ["ETag"] = new[] { "The DecisionSpec has been modified. Please reload and try again." }
+                })
+            {
+                Title = "Concurrency conflict",
+                Status = 409
+            });
+        }
+    }
+
+    /// <summary>
+    /// Retrieves the full DecisionSpec document optimized for runtime consumption.
+    /// </summary>
+    [HttpGet("{specId}/full")]
+    [ProducesResponseType(typeof(DecisionSpecDocumentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> GetFullDocument(
+        string specId,
+        [FromQuery] string? version = null,
+        CancellationToken cancellationToken = default)
+    {
+        var json = await _repository.GetFullDocumentJsonAsync(specId, version, cancellationToken);
+        
+        if (json == null)
+        {
+            return NotFound();
+        }
+
+        // Get ETag for the document
+        var result = await _repository.GetAsync(specId, version, cancellationToken);
+        if (result != null)
+        {
+            Response.Headers.Append("ETag", result.Value.ETag);
+        }
+
+        return Content(json, "application/json");
+    }
+
+    /// <summary>
+    /// Restores a soft-deleted DecisionSpec.
+    /// </summary>
+    [HttpPost("{specId}/restore")]
+    [ProducesResponseType(typeof(DecisionSpecDocumentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<DecisionSpecDocumentDto>> Restore(
+        string specId,
+        [FromQuery] string version,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _repository.RestoreAsync(specId, version, cancellationToken);
+
+        if (result == null)
+        {
+            return NotFound();
+        }
+
+        var (doc, etag) = result.Value;
+        Response.Headers.Append("ETag", etag);
+
+        return Ok(MapToDocumentDto(doc));
+    }
+
+    /// <summary>
+    /// Retrieves audit history for a DecisionSpec.
+    /// </summary>
+    [HttpGet("{specId}/audit")]
+    [ProducesResponseType(typeof(AuditLogResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AuditLogResponse>> GetAuditHistory(
+        string specId,
+        CancellationToken cancellationToken = default)
+    {
+        var entries = await _repository.GetAuditHistoryAsync(specId, cancellationToken);
+
+        return Ok(new AuditLogResponse
+        {
+            SpecId = specId,
+            Events = entries.Select(e => new AuditEventDto
+            {
+                Id = e.AuditId,
+                Action = e.Action,
+                Summary = e.Summary,
+                Actor = e.Actor,
+                Source = e.Source,
+                CreatedAt = e.CreatedAt
+            }).ToList()
+        });
+    }
+
+    /// <summary>
+    /// Patches a single question within a DecisionSpec.
+    /// </summary>
+    [HttpPatch("{specId}/questions/{questionId}")]
+    [ProducesResponseType(typeof(DecisionSpecDocumentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Microsoft.AspNetCore.Mvc.ValidationProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<DecisionSpecDocumentDto>> PatchQuestion(
+        string specId,
+        string questionId,
+        [FromBody] QuestionPatchRequest request,
+        [FromHeader(Name = "If-Match")] string ifMatch,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(ifMatch))
+        {
+            return BadRequest(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
+                new Dictionary<string, string[]>
+                {
+                    ["If-Match"] = new[] { "If-Match header is required for patches" }
+                })
+            {
+                Title = "If-Match header is required",
+                Status = 400
+            });
+        }
+
+        try
+        {
+            var options = request.Options?.Select(o => new Option
+            {
+                OptionId = o.OptionId,
+                Label = o.Label,
+                Value = o.Value,
+                NextQuestionId = o.NextQuestionId
+            }).ToList();
+
+            var result = await _questionPatchService.PatchQuestionAsync(
+                specId,
+                questionId,
+                request.Prompt,
+                request.HelpText,
+                options,
+                request.Validation,
+                ifMatch,
+                User.Identity?.Name ?? "API",
+                cancellationToken);
+
+            if (result == null)
+            {
+                return NotFound();
+            }
+
+            var (doc, etag) = result.Value;
+            Response.Headers.Append("ETag", etag);
+
+            return Ok(MapToDocumentDto(doc));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
+                new Dictionary<string, string[]>
+                {
+                    ["questionId"] = new[] { $"Question {questionId} not found in spec {specId}" }
+                })
+            {
+                Title = "Question not found",
+                Status = 404
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("ETag mismatch"))
+        {
+            return Conflict(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
+                new Dictionary<string, string[]>
+                {
+                    ["ETag"] = new[] { "The DecisionSpec has been modified. Please reload and try again." }
+                })
+            {
+                Title = "Concurrency conflict",
+                Status = 409
+            });
+        }
+    }
+    /// <summary>
+    /// Transitions a DecisionSpec to a new lifecycle status.
+    /// </summary>
+    [HttpPost("{specId}/status")]
+    [ProducesResponseType(typeof(DecisionSpecDocumentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(Microsoft.AspNetCore.Mvc.ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<DecisionSpecDocumentDto>> TransitionStatus(
+        string specId,
+        [FromBody] StatusTransitionRequest request,
+        [FromHeader(Name = "If-Match")] string ifMatch,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(ifMatch))
+        {
+            return BadRequest(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
+                new Dictionary<string, string[]>
+                {
+                    ["If-Match"] = new[] { "If-Match header is required for status transitions" }
+                })
+            {
+                Title = "If-Match header is required",
+                Status = 400
+            });
+        }
+
+        try
+        {
+            // Get current spec
+            var current = await _repository.GetAsync(specId, null, cancellationToken);
+            if (current == null)
+            {
+                return NotFound();
+            }
+
+            var (doc, currentETag) = current.Value;
+
+            // Verify ETag
+            if (currentETag != ifMatch)
+            {
+                return Conflict(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
+                    new Dictionary<string, string[]>
+                    {
+                        ["ETag"] = new[] { "The DecisionSpec has been modified. Please reload and try again." }
+                    })
+                {
+                    Title = "Concurrency conflict",
+                    Status = 409
+                });
+            }
+
+            // Validate transition
+            if (!IsValidTransition(doc.Status, request.NewStatus))
+            {
+                return BadRequest(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
+                    new Dictionary<string, string[]>
+                    {
+                        ["newStatus"] = new[] { $"Cannot transition from {doc.Status} to {request.NewStatus}" }
+                    })
+                {
+                    Title = "Invalid status transition",
+                    Status = 400
+                });
+            }
+
+            // Update status
+            doc.Status = request.NewStatus;
+            doc.Metadata.UpdatedAt = DateTimeOffset.UtcNow;
+            doc.Metadata.UpdatedBy = User.Identity?.Name ?? "API";
+
+            var result = await _repository.UpdateAsync(specId, doc, ifMatch, cancellationToken);
+
+            if (result == null)
+            {
+                return NotFound();
+            }
+
+            var (updated, etag) = result.Value;
+            Response.Headers.Append("ETag", etag);
+
+            return Ok(MapToDocumentDto(updated));
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("ETag mismatch"))
+        {
+            return Conflict(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
+                new Dictionary<string, string[]>
+                {
+                    ["ETag"] = new[] { "The DecisionSpec has been modified. Please reload and try again." }
+                })
+            {
+                Title = "Concurrency conflict",
+                Status = 409
+            });
+        }
+    }
+
+    /// <summary>
+    /// Validates lifecycle state transitions.
+    /// </summary>
+    private static bool IsValidTransition(string currentStatus, string newStatus)
+    {
+        return (currentStatus, newStatus) switch
+        {
+            ("Draft", "InReview") => true,
+            ("Draft", "Retired") => true,
+            ("InReview", "Draft") => true,
+            ("InReview", "Published") => true,
+            ("Published", "InReview") => true,
+            ("Published", "Retired") => true,
+            _ => false
+        };
+    }
+    // Helper methods for mapping
+    private static DecisionSpecSummaryDto MapToSummaryDto(DecisionSpecSummary summary)
+    {
+        return new DecisionSpecSummaryDto
+        {
+            SpecId = summary.SpecId,
+            Name = summary.Name,
+            Status = summary.Status,
+            Owner = summary.Owner,
+            Version = summary.Version,
+            UpdatedAt = summary.UpdatedAt,
+            QuestionCount = summary.QuestionCount,
+            HasUnverifiedDraft = summary.HasUnverifiedDraft
+        };
+    }
+
+    private static DecisionSpecDocument MapToDocument(DecisionSpecCreateRequest request)
+    {
+        return new DecisionSpecDocument
+        {
+            SpecId = request.SpecId,
+            Version = request.Version,
+            Status = request.Status,
+            Metadata = new DecisionSpecMetadata
+            {
+                Name = request.Metadata.Name,
+                Description = request.Metadata.Description,
+                Tags = request.Metadata.Tags
+            },
+            Questions = request.Questions.Select(q => new Question
+            {
+                QuestionId = q.QuestionId,
+                Type = q.Type,
+                Prompt = q.Prompt,
+                HelpText = q.HelpText,
+                Required = q.Required,
+                Options = q.Options.Select(o => new Option
+                {
+                    OptionId = o.OptionId,
+                    Label = o.Label,
+                    Value = o.Value,
+                    NextQuestionId = o.NextQuestionId
+                }).ToList(),
+                Validation = q.Validation
+            }).ToList(),
+            Outcomes = request.Outcomes.Select(o => new Outcome
+            {
+                OutcomeId = o.OutcomeId,
+                SelectionRules = o.SelectionRules,
+                DisplayCards = o.DisplayCards.Select(dc => new OutcomeDisplayCard
+                {
+                    Title = dc.ToString() ?? "",
+                    Description = ""
+                }).ToList()
+            }).ToList()
+        };
+    }
+
+    private static DecisionSpecDocument MapToDocument(DecisionSpecDocumentDto dto)
+    {
+        return new DecisionSpecDocument
+        {
+            SpecId = dto.SpecId,
+            Version = dto.Version,
+            Status = dto.Status,
+            Metadata = new DecisionSpecMetadata
+            {
+                Name = dto.Metadata.Name,
+                Description = dto.Metadata.Description,
+                Tags = dto.Metadata.Tags
+            },
+            Questions = dto.Questions.Select(q => new Question
+            {
+                QuestionId = q.QuestionId,
+                Type = q.Type,
+                Prompt = q.Prompt,
+                HelpText = q.HelpText,
+                Required = q.Required,
+                Options = q.Options.Select(o => new Option
+                {
+                    OptionId = o.OptionId,
+                    Label = o.Label,
+                    Value = o.Value,
+                    NextQuestionId = o.NextQuestionId
+                }).ToList(),
+                Validation = q.Validation
+            }).ToList(),
+            Outcomes = dto.Outcomes.Select(o => new Outcome
+            {
+                OutcomeId = o.OutcomeId,
+                SelectionRules = o.SelectionRules,
+                DisplayCards = o.DisplayCards.Select(dc => new OutcomeDisplayCard
+                {
+                    Title = dc.ToString() ?? "",
+                    Description = ""
+                }).ToList()
+            }).ToList()
+        };
+    }
+
+    private static DecisionSpecDocumentDto MapToDocumentDto(DecisionSpecDocument doc)
+    {
+        return new DecisionSpecDocumentDto
+        {
+            SpecId = doc.SpecId,
+            Version = doc.Version,
+            Status = doc.Status,
+            Metadata = new DecisionSpecMetadataDto
+            {
+                Name = doc.Metadata.Name,
+                Description = doc.Metadata.Description,
+                Tags = doc.Metadata.Tags
+            },
+            Questions = doc.Questions.Select(q => new QuestionDto
+            {
+                QuestionId = q.QuestionId,
+                Type = q.Type,
+                Prompt = q.Prompt,
+                HelpText = q.HelpText,
+                Required = q.Required,
+                Options = q.Options.Select(o => new OptionDto
+                {
+                    OptionId = o.OptionId,
+                    Label = o.Label,
+                    Value = o.Value,
+                    NextQuestionId = o.NextQuestionId
+                }).ToList(),
+                Validation = q.Validation
+            }).ToList(),
+            Outcomes = doc.Outcomes.Select(o => new OutcomeDto
+            {
+                OutcomeId = o.OutcomeId,
+                SelectionRules = o.SelectionRules,
+                DisplayCards = o.DisplayCards.Select(dc => (object)dc).ToList()
+            }).ToList()
+        };
+    }
+}
