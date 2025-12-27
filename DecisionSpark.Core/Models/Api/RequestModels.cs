@@ -10,6 +10,10 @@ public class StartRequest
 
 public class NextRequest
 {
+    public NextRequest()
+    {
+    }
+    
     private string? _userInput;
     
     [JsonPropertyName("user_input")]

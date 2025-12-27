@@ -4,6 +4,7 @@ using DecisionSpark.Core.Models.Configuration;
 using DecisionSpark.Core.Persistence.FileStorage;
 using DecisionSpark.Core.Persistence.Repositories;
 using DecisionSpark.Core.Services.Validation;
+using DecisionSpark.Swagger;
 using FluentValidation;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
@@ -113,6 +114,28 @@ try
                 Array.Empty<string>()
             }
         });
+
+        // Use fully qualified type names to avoid schema ID conflicts
+        options.CustomSchemaIds(type => type.FullName?.Replace("+", "."));
+
+        // Configure to handle Dictionary<string, object> and polymorphic types
+        options.UseAllOfToExtendReferenceSchemas();
+        options.UseOneOfForPolymorphism();
+        options.UseAllOfForInheritance();
+        
+        // Handle Dictionary<string, object> as additionalProperties
+        options.MapType<Dictionary<string, object>>(() => new OpenApiSchema
+        {
+            Type = "object",
+            AdditionalPropertiesAllowed = true,
+            AdditionalProperties = new OpenApiSchema
+            {
+                Type = "object"
+            }
+        });
+        
+        // Add schema filter to handle List<object> and other complex types
+        options.SchemaFilter<ObjectTypeSchemaFilter>();
 
         // Include XML comments
         var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
