@@ -17,6 +17,7 @@ public class ApiKeyAuthenticationMiddleware
         "/swagger",
         "/health",
         "/about",
+        "/admin",
         "/"
     };
 

@@ -30,6 +30,7 @@ public class DecisionSpecRepositoryTests : IDisposable
         var options = Options.Create(new DecisionSpecsOptions
         {
             RootPath = _tempDirectory,
+            LegacyConfigPath = null, // No legacy path for tests
             SoftDeleteRetentionDays = 30,
             IndexFileName = "DecisionSpecIndex.json"
         });
@@ -38,11 +39,14 @@ public class DecisionSpecRepositoryTests : IDisposable
         var fileStoreLogger = new LoggerFactory().CreateLogger<DecisionSpecFileStore>();
         _fileStore = new DecisionSpecFileStore(options, fileStoreLogger);
 
+        var legacyAdapterLogger = new LoggerFactory().CreateLogger<LegacyDecisionSpecAdapter>();
+        var legacyAdapter = new LegacyDecisionSpecAdapter(legacyAdapterLogger);
+
         var indexerLogger = new LoggerFactory().CreateLogger<FileSearchIndexer>();
-        _indexer = new FileSearchIndexer(options, indexerLogger, _fileStore);
+        _indexer = new FileSearchIndexer(options, indexerLogger, _fileStore, legacyAdapter);
 
         var repositoryLogger = new LoggerFactory().CreateLogger<DecisionSpecRepository>();
-        _repository = new DecisionSpecRepository(_fileStore, _indexer, repositoryLogger);
+        _repository = new DecisionSpecRepository(_fileStore, _indexer, legacyAdapter, options, repositoryLogger);
     }
 
     public void Dispose()

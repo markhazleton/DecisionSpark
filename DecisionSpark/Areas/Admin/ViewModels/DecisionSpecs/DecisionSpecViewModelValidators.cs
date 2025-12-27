@@ -14,8 +14,8 @@ public class DecisionSpecEditViewModelValidator : AbstractValidator<DecisionSpec
             .NotEmpty()
             .WithMessage("Spec ID is required")
             .WithErrorCode("SPEC_ID_REQUIRED")
-            .Matches(@"^[a-z0-9-]+$")
-            .WithMessage("Spec ID must contain only lowercase letters, numbers, and hyphens")
+            .Matches(@"^[A-Za-z0-9_-]+$")
+            .WithMessage("Spec ID must contain only letters, numbers, underscores, and hyphens")
             .WithErrorCode("SPEC_ID_INVALID_FORMAT");
 
         RuleFor(x => x.Version)
@@ -109,8 +109,8 @@ public class QuestionViewModelValidator : AbstractValidator<QuestionViewModel>
             .NotEmpty()
             .WithMessage("Question ID is required")
             .WithErrorCode("QUESTION_ID_REQUIRED")
-            .Matches(@"^[a-z0-9-]+$")
-            .WithMessage("Question ID must contain only lowercase letters, numbers, and hyphens")
+            .Matches(@"^[A-Za-z0-9_-]+$")
+            .WithMessage("Question ID must contain only letters, numbers, underscores, and hyphens")
             .WithErrorCode("QUESTION_ID_INVALID_FORMAT");
 
         RuleFor(x => x.Type)
@@ -188,8 +188,8 @@ public class OutcomeViewModelValidator : AbstractValidator<OutcomeViewModel>
             .NotEmpty()
             .WithMessage("Outcome ID is required")
             .WithErrorCode("OUTCOME_ID_REQUIRED")
-            .Matches(@"^[a-z0-9-]+$")
-            .WithMessage("Outcome ID must contain only lowercase letters, numbers, and hyphens")
+            .Matches(@"^[A-Za-z0-9_-]+$")
+            .WithMessage("Outcome ID must contain only letters, numbers, underscores, and hyphens")
             .WithErrorCode("OUTCOME_ID_INVALID_FORMAT");
     }
 }

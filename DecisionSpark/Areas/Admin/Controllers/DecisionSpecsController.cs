@@ -1,7 +1,6 @@
 using DecisionSpark.Areas.Admin.ViewModels.DecisionSpecs;
 using DecisionSpark.Core.Persistence.Repositories;
 using DecisionSpark.Core.Services;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DecisionSpark.Areas.Admin.Controllers;
@@ -10,7 +9,6 @@ namespace DecisionSpark.Areas.Admin.Controllers;
 /// Admin controller for managing DecisionSpecs through the web UI.
 /// </summary>
 [Area("Admin")]
-[Authorize(Roles = "Admin")]
 [Route("Admin/DecisionSpecs")]
 public class DecisionSpecsController : Controller
 {

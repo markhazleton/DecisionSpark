@@ -13,6 +13,12 @@ public class DecisionSpecsOptions
     public string RootPath { get; set; } = string.Empty;
 
     /// <summary>
+    /// Legacy path where old format DecisionSpec files are stored (optional, for backward compatibility).
+    /// If specified, the system will scan this location for .active.json files and convert them.
+    /// </summary>
+    public string? LegacyConfigPath { get; set; }
+
+    /// <summary>
     /// Number of days to retain soft-deleted specs before permanent removal.
     /// </summary>
     public int SoftDeleteRetentionDays { get; set; } = 30;

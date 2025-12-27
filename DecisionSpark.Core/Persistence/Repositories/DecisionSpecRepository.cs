@@ -1,7 +1,9 @@
 using System.Text.Json;
+using DecisionSpark.Core.Models.Configuration;
 using DecisionSpark.Core.Models.Spec;
 using DecisionSpark.Core.Persistence.FileStorage;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DecisionSpark.Core.Persistence.Repositories;
 
@@ -12,15 +14,21 @@ public class DecisionSpecRepository : IDecisionSpecRepository
 {
     private readonly DecisionSpecFileStore _fileStore;
     private readonly FileSearchIndexer _indexer;
+    private readonly LegacyDecisionSpecAdapter _legacyAdapter;
+    private readonly DecisionSpecsOptions _options;
     private readonly ILogger<DecisionSpecRepository> _logger;
 
     public DecisionSpecRepository(
         DecisionSpecFileStore fileStore,
         FileSearchIndexer indexer,
+        LegacyDecisionSpecAdapter legacyAdapter,
+        IOptions<DecisionSpecsOptions> options,
         ILogger<DecisionSpecRepository> logger)
     {
         _fileStore = fileStore;
         _indexer = indexer;
+        _legacyAdapter = legacyAdapter;
+        _options = options.Value;
         _logger = logger;
     }
 
@@ -59,7 +67,7 @@ public class DecisionSpecRepository : IDecisionSpecRepository
             version = entry.Version;
         }
 
-        // Try to find in all status folders
+        // Try to find in all status folders (new format)
         foreach (var status in new[] { "Published", "Draft", "InReview", "Retired" })
         {
             var result = await _fileStore.ReadAsync(specId, version, status, cancellationToken);
@@ -74,7 +82,35 @@ public class DecisionSpecRepository : IDecisionSpecRepository
             }
         }
 
+        // Try legacy location if configured
+        if (!string.IsNullOrWhiteSpace(_options.LegacyConfigPath) && Directory.Exists(_options.LegacyConfigPath))
+        {
+            var legacyFiles = Directory.GetFiles(_options.LegacyConfigPath, $"{specId}*.active.json", SearchOption.TopDirectoryOnly);
+            
+            if (legacyFiles.Length > 0)
+            {
+                var filePath = legacyFiles[0]; // Take first match
+                var content = await File.ReadAllTextAsync(filePath, cancellationToken);
+                var fileName = Path.GetFileName(filePath);
+                
+                var converted = _legacyAdapter.ConvertLegacySpec(content, fileName);
+                if (converted != null)
+                {
+                    var etag = ComputeETag(content);
+                    _logger.LogInformation("Loaded legacy spec {SpecId} from {FileName}", specId, fileName);
+                    return (converted, etag);
+                }
+            }
+        }
+
         return null;
+    }
+
+    private static string ComputeETag(string content)
+    {
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        var hash = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(content));
+        return Convert.ToBase64String(hash);
     }
 
     public async Task<(DecisionSpecDocument Document, string ETag)?> UpdateAsync(string specId, DecisionSpecDocument spec, string ifMatchETag, CancellationToken cancellationToken = default)

@@ -50,7 +50,7 @@ public class DecisionSpecSummaryViewModel
 public class DecisionSpecEditViewModel
 {
     [Required(ErrorMessage = "Spec ID is required")]
-    [RegularExpression(@"^[a-z0-9-]+$", ErrorMessage = "Spec ID must contain only lowercase letters, numbers, and hyphens")]
+    [RegularExpression(@"^[A-Za-z0-9_-]+$", ErrorMessage = "Spec ID must contain only letters, numbers, underscores, and hyphens")]
     public string SpecId { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Version is required")]
@@ -104,7 +104,7 @@ public class DecisionSpecMetadataViewModel
 public class QuestionViewModel
 {
     [Required(ErrorMessage = "Question ID is required")]
-    [RegularExpression(@"^[a-z0-9-]+$", ErrorMessage = "Question ID must contain only lowercase letters, numbers, and hyphens")]
+    [RegularExpression(@"^[A-Za-z0-9_-]+$", ErrorMessage = "Question ID must contain only letters, numbers, underscores, and hyphens")]
     public string QuestionId { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Question type is required")]
@@ -147,10 +147,25 @@ public class OptionViewModel
 public class OutcomeViewModel
 {
     [Required(ErrorMessage = "Outcome ID is required")]
-    [RegularExpression(@"^[a-z0-9-]+$", ErrorMessage = "Outcome ID must contain only lowercase letters, numbers, and hyphens")]
+    [RegularExpression(@"^[A-Za-z0-9_-]+$", ErrorMessage = "Outcome ID must contain only letters, numbers, underscores, and hyphens")]
     public string OutcomeId { get; set; } = string.Empty;
 
     public List<string> SelectionRules { get; set; } = new();
+
+    public List<OutcomeDisplayCardViewModel> DisplayCards { get; set; } = new();
+}
+
+/// <summary>
+/// View model for an outcome display card.
+/// </summary>
+public class OutcomeDisplayCardViewModel
+{
+    [Required(ErrorMessage = "Card title is required")]
+    [StringLength(200, ErrorMessage = "Title cannot exceed 200 characters")]
+    public string Title { get; set; } = string.Empty;
+
+    [StringLength(1000, ErrorMessage = "Description cannot exceed 1000 characters")]
+    public string Description { get; set; } = string.Empty;
 }
 
 /// <summary>

@@ -1,0 +1,80 @@
+@model DecisionSpark.Areas.Admin.ViewModels.DecisionSpecs.OutcomeViewModel
+@{
+    var index = ViewData["Index"] as int? ?? 0;
+}
+
+<div class="outcome-editor border rounded p-3 mb-3" data-index="@index">
+    <div class="d-flex justify-content-between mb-3">
+        <h6>Outcome @(index + 1)</h6>
+        <button type="button" class="btn btn-sm btn-danger" onclick="removeOutcome(@index)">
+            <i class="bi bi-trash"></i>
+        </button>
+    </div>
+
+    <div class="mb-3">
+        <label for="Outcomes_@(index)__OutcomeId" class="form-label">Outcome ID *</label>
+        <input type="text" 
+               name="Outcomes[@index].OutcomeId" 
+               id="Outcomes_@(index)__OutcomeId"
+               value="@Model.OutcomeId" 
+               class="form-control" 
+               placeholder="e.g., OUTCOME_A, result-1, high_priority" 
+               required />
+        <small class="form-text text-muted">Unique identifier - letters, numbers, underscores, hyphens</small>
+    </div>
+
+    <div class="mb-3">
+        <label for="Outcomes_@(index)__SelectionRules" class="form-label">Selection Rules</label>
+        <div id="rulesContainer_@index">
+            @for (int i = 0; i < Model.SelectionRules.Count; i++)
+            {
+                <div class="input-group mb-2" data-rule-index="@i">
+                    <input type="text" 
+                           name="Outcomes[@index].SelectionRules[@i]" 
+                           value="@Model.SelectionRules[i]"
+                           class="form-control" 
+                           placeholder="e.g., q1 == 'option-a'" />
+                    <button type="button" class="btn btn-outline-danger" onclick="removeRule(@index, @i)">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            }
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRule(@index)">
+            <i class="bi bi-plus"></i> Add Rule
+        </button>
+        <small class="form-text text-muted d-block mt-2">Define conditions for when this outcome should be selected</small>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Display Cards</label>
+        <div id="cardsContainer_@index">
+            @for (int i = 0; i < Model.DisplayCards.Count; i++)
+            {
+                var card = Model.DisplayCards[i];
+                <div class="card mb-2" data-card-index="@i">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <strong>Card @(i + 1)</strong>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeCard(@index, @i)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        <input type="text" 
+                               name="Outcomes[@index].DisplayCards[@i].Title" 
+                               value="@card.Title"
+                               class="form-control mb-2" 
+                               placeholder="Card title" />
+                        <textarea name="Outcomes[@index].DisplayCards[@i].Description" 
+                                  class="form-control" 
+                                  rows="2"
+                                  placeholder="Card description">@card.Description</textarea>
+                    </div>
+                </div>
+            }
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCard(@index)">
+            <i class="bi bi-plus"></i> Add Display Card
+        </button>
+    </div>
+</div>

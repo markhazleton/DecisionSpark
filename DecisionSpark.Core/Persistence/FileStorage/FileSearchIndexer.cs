@@ -29,16 +29,19 @@ public class FileSearchIndexer
     private readonly DecisionSpecsOptions _options;
     private readonly ILogger<FileSearchIndexer> _logger;
     private readonly DecisionSpecFileStore _fileStore;
+    private readonly LegacyDecisionSpecAdapter _legacyAdapter;
     private static readonly SemaphoreSlim _indexLock = new(1, 1);
 
     public FileSearchIndexer(
         IOptions<DecisionSpecsOptions> options,
         ILogger<FileSearchIndexer> logger,
-        DecisionSpecFileStore fileStore)
+        DecisionSpecFileStore fileStore,
+        LegacyDecisionSpecAdapter legacyAdapter)
     {
         _options = options.Value;
         _logger = logger;
         _fileStore = fileStore;
+        _legacyAdapter = legacyAdapter;
     }
 
     /// <summary>
@@ -152,6 +155,7 @@ public class FileSearchIndexer
             var newIndex = new Dictionary<string, DecisionSpecIndexEntry>();
             var statuses = new[] { "draft", "inreview", "published", "retired" };
 
+            // Scan new format files
             foreach (var status in statuses)
             {
                 var files = _fileStore.ListFiles(status);
@@ -200,6 +204,51 @@ public class FileSearchIndexer
                 }
             }
 
+            // Scan legacy format files if LegacyConfigPath is configured
+            if (!string.IsNullOrWhiteSpace(_options.LegacyConfigPath) && Directory.Exists(_options.LegacyConfigPath))
+            {
+                _logger.LogInformation("Scanning legacy DecisionSpecs from {Path}", _options.LegacyConfigPath);
+                
+                var legacyFiles = Directory.GetFiles(_options.LegacyConfigPath, "*.active.json", SearchOption.TopDirectoryOnly);
+                
+                foreach (var filePath in legacyFiles)
+                {
+                    try
+                    {
+                        var content = await File.ReadAllTextAsync(filePath, cancellationToken);
+                        var fileName = Path.GetFileName(filePath);
+                        
+                        var converted = _legacyAdapter.ConvertLegacySpec(content, fileName);
+                        if (converted != null)
+                        {
+                            var entry = new DecisionSpecIndexEntry
+                            {
+                                SpecId = converted.SpecId,
+                                Version = converted.Version,
+                                Status = converted.Status,
+                                Name = converted.Metadata.Name,
+                                Owner = converted.Metadata.Owner,
+                                QuestionCount = converted.Questions.Count,
+                                UpdatedAt = File.GetLastWriteTimeUtc(filePath),
+                                HasUnverifiedDraft = converted.Metadata.Unverified,
+                                ETag = ComputeETag(content)
+                            };
+
+                            // Only add if not already in index from new location
+                            if (!newIndex.ContainsKey(entry.SpecId))
+                            {
+                                newIndex[entry.SpecId] = entry;
+                                _logger.LogDebug("Indexed legacy spec {SpecId} from {FileName}", entry.SpecId, fileName);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to index legacy file {FilePath}", filePath);
+                    }
+                }
+            }
+
             await SaveIndexAsync(newIndex, cancellationToken);
             _logger.LogInformation("Index rebuilt with {Count} entries", newIndex.Count);
         }
@@ -238,5 +287,12 @@ public class FileSearchIndexer
         var json = JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
         
         await File.WriteAllTextAsync(indexPath, json, cancellationToken);
+    }
+
+    private static string ComputeETag(string content)
+    {
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        var hash = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(content));
+        return Convert.ToBase64String(hash);
     }
 }

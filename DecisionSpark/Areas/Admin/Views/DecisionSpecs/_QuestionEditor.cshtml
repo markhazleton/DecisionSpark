@@ -1,0 +1,104 @@
+@model DecisionSpark.Areas.Admin.ViewModels.DecisionSpecs.QuestionViewModel
+@{
+    var index = ViewData["Index"] as int? ?? 0;
+}
+
+<div class="question-editor border rounded p-3 mb-3" data-index="@index">
+    <div class="d-flex justify-content-between mb-3">
+        <h6>Question @(index + 1)</h6>
+        <button type="button" class="btn btn-sm btn-danger" onclick="removeQuestion(@index)">
+            <i class="bi bi-trash"></i>
+        </button>
+    </div>
+
+    <div class="mb-3">
+        <label for="Questions_@(index)__QuestionId" class="form-label">Question ID *</label>
+        <input type="text" 
+               name="Questions[@index].QuestionId" 
+               id="Questions_@(index)__QuestionId"
+               value="@Model.QuestionId" 
+               class="form-control" 
+               placeholder="e.g., Q1, question_1, user-preference" 
+               required />
+        <small class="form-text text-muted">Unique identifier - letters, numbers, underscores, hyphens</small>
+    </div>
+
+    <div class="mb-3">
+        <label for="Questions_@(index)__Type" class="form-label">Question Type *</label>
+        <select name="Questions[@index].Type" 
+                id="Questions_@(index)__Type"
+                class="form-select" 
+                required>
+            <option value="SingleSelect" selected="@(Model.Type == "SingleSelect")">Single Select</option>
+            <option value="MultiSelect" selected="@(Model.Type == "MultiSelect")">Multi Select</option>
+            <option value="Text" selected="@(Model.Type == "Text")">Text</option>
+            <option value="Number" selected="@(Model.Type == "Number")">Number</option>
+            <option value="Date" selected="@(Model.Type == "Date")">Date</option>
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="Questions_@(index)__Prompt" class="form-label">Question Prompt *</label>
+        <textarea name="Questions[@index].Prompt" 
+                  id="Questions_@(index)__Prompt"
+                  class="form-control" 
+                  rows="2"
+                  placeholder="Enter the question text..." 
+                  required>@Model.Prompt</textarea>
+    </div>
+
+    <div class="mb-3">
+        <label for="Questions_@(index)__HelpText" class="form-label">Help Text</label>
+        <input type="text" 
+               name="Questions[@index].HelpText" 
+               id="Questions_@(index)__HelpText"
+               value="@Model.HelpText" 
+               class="form-control" 
+               placeholder="Additional guidance for users (optional)" />
+    </div>
+
+    <div class="mb-3 form-check">
+        <input type="checkbox" 
+               name="Questions[@index].Required" 
+               id="Questions_@(index)__Required"
+               class="form-check-input" 
+               checked="@Model.Required" 
+               value="true" />
+        <input type="hidden" name="Questions[@index].Required" value="false" />
+        <label class="form-check-label" for="Questions_@(index)__Required">
+            Required question
+        </label>
+    </div>
+
+    @if (Model.Type == "SingleSelect" || Model.Type == "MultiSelect")
+    {
+        <div class="mb-3">
+            <label class="form-label">Options</label>
+            <div id="optionsContainer_@index">
+                @for (int i = 0; i < Model.Options.Count; i++)
+                {
+                    var option = Model.Options[i];
+                    <div class="input-group mb-2" data-option-index="@i">
+                        <input type="hidden" name="Questions[@index].Options[@i].OptionId" value="@option.OptionId" />
+                        <input type="text" 
+                               name="Questions[@index].Options[@i].Label" 
+                               value="@option.Label"
+                               class="form-control" 
+                               placeholder="Option label" />
+                        <input type="text" 
+                               name="Questions[@index].Options[@i].Value" 
+                               value="@option.Value"
+                               class="form-control" 
+                               placeholder="Value" />
+                        <button type="button" class="btn btn-outline-danger" onclick="removeOption(@index, @i)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                }
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addOption(@index)">
+                <i class="bi bi-plus"></i> Add Option
+            </button>
+        </div>
+    }
+</div>

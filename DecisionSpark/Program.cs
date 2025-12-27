@@ -175,6 +175,7 @@ try
 
     // Register DecisionSpec file storage and repository services
     builder.Services.AddSingleton<DecisionSpecFileStore>();
+    builder.Services.AddSingleton<LegacyDecisionSpecAdapter>();
     builder.Services.AddSingleton<FileSearchIndexer>();
     builder.Services.AddSingleton<IDecisionSpecRepository, DecisionSpecRepository>();
     builder.Services.AddScoped<QuestionPatchService>();

@@ -64,10 +64,10 @@
                             <div class="col-md-6">
                                 <label asp-for="SpecId" class="form-label">Spec ID *</label>
                                 <input asp-for="SpecId" class="form-control" 
-                                       @(Model.IsNewSpec ? "" : "readonly")
-                                       placeholder="e.g., customer-onboarding" />
+                                       readonly="@(!Model.IsNewSpec)"
+                                       placeholder="e.g., TECH_STACK_ADVISOR_V1" />
                                 <span asp-validation-for="SpecId" class="text-danger"></span>
-                                <small class="form-text text-muted">Lowercase letters, numbers, and hyphens only</small>
+                                <small class="form-text text-muted">Letters, numbers, underscores, and hyphens</small>
                             </div>
                             <div class="col-md-6">
                                 <label asp-for="Version" class="form-label">Version *</label>
@@ -331,6 +331,110 @@
 
         function updateTagsHidden(tags) {
             document.getElementById('tagsHidden').value = JSON.stringify(tags);
+        }
+
+        // Functions for managing question options
+        let optionCounters = {};
+        
+        function addOption(questionIndex) {
+            if (!optionCounters[questionIndex]) {
+                optionCounters[questionIndex] = document.querySelectorAll(`#optionsContainer_${questionIndex} .input-group`).length;
+            }
+            
+            const container = document.getElementById(`optionsContainer_${questionIndex}`);
+            const optionIndex = optionCounters[questionIndex]++;
+            
+            const newOption = `
+                <div class="input-group mb-2" data-option-index="${optionIndex}">
+                    <input type="hidden" name="Questions[${questionIndex}].Options[${optionIndex}].OptionId" value="opt${optionIndex}" />
+                    <input type="text" 
+                           name="Questions[${questionIndex}].Options[${optionIndex}].Label" 
+                           class="form-control" 
+                           placeholder="Option label" />
+                    <input type="text" 
+                           name="Questions[${questionIndex}].Options[${optionIndex}].Value" 
+                           class="form-control" 
+                           placeholder="Value" />
+                    <button type="button" class="btn btn-outline-danger" onclick="removeOption(${questionIndex}, ${optionIndex})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', newOption);
+        }
+
+        function removeOption(questionIndex, optionIndex) {
+            const option = document.querySelector(`#optionsContainer_${questionIndex} [data-option-index="${optionIndex}"]`);
+            if (option) option.remove();
+        }
+
+        // Functions for managing outcome rules
+        let ruleCounters = {};
+        
+        function addRule(outcomeIndex) {
+            if (!ruleCounters[outcomeIndex]) {
+                ruleCounters[outcomeIndex] = document.querySelectorAll(`#rulesContainer_${outcomeIndex} .input-group`).length;
+            }
+            
+            const container = document.getElementById(`rulesContainer_${outcomeIndex}`);
+            const ruleIndex = ruleCounters[outcomeIndex]++;
+            
+            const newRule = `
+                <div class="input-group mb-2" data-rule-index="${ruleIndex}">
+                    <input type="text" 
+                           name="Outcomes[${outcomeIndex}].SelectionRules[${ruleIndex}]" 
+                           class="form-control" 
+                           placeholder="e.g., q1 == 'option-a'" />
+                    <button type="button" class="btn btn-outline-danger" onclick="removeRule(${outcomeIndex}, ${ruleIndex})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', newRule);
+        }
+
+        function removeRule(outcomeIndex, ruleIndex) {
+            const rule = document.querySelector(`#rulesContainer_${outcomeIndex} [data-rule-index="${ruleIndex}"]`);
+            if (rule) rule.remove();
+        }
+
+        // Functions for managing outcome display cards
+        let cardCounters = {};
+        
+        function addCard(outcomeIndex) {
+            if (!cardCounters[outcomeIndex]) {
+                cardCounters[outcomeIndex] = document.querySelectorAll(`#cardsContainer_${outcomeIndex} .card`).length;
+            }
+            
+            const container = document.getElementById(`cardsContainer_${outcomeIndex}`);
+            const cardIndex = cardCounters[outcomeIndex]++;
+            
+            const newCard = `
+                <div class="card mb-2" data-card-index="${cardIndex}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <strong>Card ${cardIndex + 1}</strong>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeCard(${outcomeIndex}, ${cardIndex})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        <input type="text" 
+                               name="Outcomes[${outcomeIndex}].DisplayCards[${cardIndex}].Title" 
+                               class="form-control mb-2" 
+                               placeholder="Card title" />
+                        <textarea name="Outcomes[${outcomeIndex}].DisplayCards[${cardIndex}].Description" 
+                                  class="form-control" 
+                                  rows="2"
+                                  placeholder="Card description"></textarea>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', newCard);
+        }
+
+        function removeCard(outcomeIndex, cardIndex) {
+            const card = document.querySelector(`#cardsContainer_${outcomeIndex} [data-card-index="${cardIndex}"]`);
+            if (card) card.remove();
         }
     </script>
 }
