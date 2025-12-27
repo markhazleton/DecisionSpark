@@ -79,7 +79,8 @@ public class DecisionSpecDraftService
 
             if (!response.Success || string.IsNullOrWhiteSpace(response.Content))
             {
-                throw new InvalidOperationException($"LLM service failed: {response.ErrorMessage ?? "Empty response"}");
+                var errorMsg = response.ErrorMessage?.ToLowerInvariant() ?? "empty response";
+                throw new InvalidOperationException($"Failed to generate draft: LLM service returned {errorMsg}");
             }
 
             _logger.LogInformation("Received LLM response for draft {DraftId} (length: {Length})", 
@@ -139,7 +140,8 @@ public class DecisionSpecDraftService
             var json = await File.ReadAllTextAsync(draftFile, cancellationToken);
             var draft = JsonSerializer.Deserialize<DecisionSpecDocument>(json, new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true
+                PropertyNameCaseInsensitive = true,
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
             });
 
             _logger.LogInformation("Retrieved draft {DraftId} from cache", draftId);

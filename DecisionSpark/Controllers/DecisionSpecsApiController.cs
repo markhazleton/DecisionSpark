@@ -4,11 +4,13 @@ using DecisionSpark.Core.Models.Spec;
 using DecisionSpark.Core.Persistence.Repositories;
 using DecisionSpark.Core.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
 
 namespace DecisionSpark.Controllers;
 
 /// <summary>
 /// API controller for DecisionSpec CRUD operations.
+/// Includes comprehensive structured logging and metrics for observability.
 /// </summary>
 [ApiController]
 [Route("api/decisionspecs")]
@@ -44,12 +46,20 @@ public class DecisionSpecsApiController : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
+        var sw = Stopwatch.StartNew();
+        _logger.LogInformation("Listing DecisionSpecs with filters: Status={Status}, Owner={Owner}, Query={Query}, Page={Page}, PageSize={PageSize}",
+            status, owner, q, page, pageSize);
+
         var summaries = await _repository.ListAsync(status, owner, q, cancellationToken);
         var items = summaries
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(MapToSummaryDto)
             .ToList();
+
+        sw.Stop();
+        _logger.LogInformation("Listed {Count} DecisionSpecs (total: {Total}) in {ElapsedMs}ms",
+            items.Count, summaries.Count(), sw.ElapsedMilliseconds);
 
         return Ok(new DecisionSpecListResponse
         {
@@ -70,13 +80,22 @@ public class DecisionSpecsApiController : ControllerBase
         [FromBody] DecisionSpecCreateRequest request,
         CancellationToken cancellationToken = default)
     {
+        var sw = Stopwatch.StartNew();
+        _logger.LogInformation("Creating DecisionSpec {SpecId} v{Version}", request.SpecId, request.Version);
+
         if (!ModelState.IsValid)
         {
+            _logger.LogWarning("Validation failed for creating DecisionSpec {SpecId}: {Errors}",
+                request.SpecId, string.Join("; ", ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage))));
             return BadRequest(ModelState);
         }
 
         var doc = MapToDocument(request);
         var (created, etag) = await _repository.CreateAsync(doc, cancellationToken);
+
+        sw.Stop();
+        _logger.LogInformation("Created DecisionSpec {SpecId} v{Version} with {TraitCount} traits and {OutcomeCount} outcomes in {ElapsedMs}ms - SC-004: audit trail",
+            created.SpecId, created.Version, created.Traits.Count, created.Outcomes.Count, sw.ElapsedMilliseconds);
 
         Response.Headers.Append("ETag", etag);
         
@@ -95,15 +114,23 @@ public class DecisionSpecsApiController : ControllerBase
         [FromQuery] string? version = null,
         CancellationToken cancellationToken = default)
     {
+        var sw = Stopwatch.StartNew();
+        _logger.LogInformation("Retrieving DecisionSpec {SpecId} v{Version}", specId, version ?? "latest");
+
         var result = await _repository.GetAsync(specId, version, cancellationToken);
         
         if (result == null)
         {
+            _logger.LogWarning("DecisionSpec {SpecId} v{Version} not found", specId, version ?? "latest");
             return NotFound();
         }
 
         var (doc, etag) = result.Value;
         Response.Headers.Append("ETag", etag);
+
+        sw.Stop();
+        _logger.LogInformation("Retrieved DecisionSpec {SpecId} v{Version} in {ElapsedMs}ms",
+            specId, version ?? "latest", sw.ElapsedMilliseconds);
 
         return Ok(MapToDocumentDto(doc));
     }
@@ -156,6 +183,7 @@ public class DecisionSpecsApiController : ControllerBase
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("ETag mismatch"))
         {
+            _logger.LogWarning(ex, "Concurrent edit collision detected for {SpecId} - SC-005: concurrent edit collision detection", specId);
             return Conflict(new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(
                 new Dictionary<string, string[]>
                 {

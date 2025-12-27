@@ -19,6 +19,8 @@ DecisionSpark is a .NET 10 web application that implements a flexible, config-dr
 ### Key Features
 
 ✅ **Conversation-Driven API** - RESTful endpoints for starting and continuing decision sessions  
+✅ **DecisionSpec Management Console** - Admin UI and API for creating, editing, and managing decision specifications  
+✅ **LLM-Assisted Spec Creation** - Generate draft specifications from natural language instructions  
 ✅ **Multiple Question Types** - Text input, single-select, and multi-select with options  
 ✅ **OpenAI Integration** - Natural language question generation and answer parsing  
 ✅ **Web UI Interface** - Interactive Razor Pages testing interface  
@@ -27,6 +29,25 @@ DecisionSpark is a .NET 10 web application that implements a flexible, config-dr
 ✅ **Session Management** - File-based conversation persistence  
 ✅ **API Documentation** - Swagger/OpenAPI with interactive testing  
 ✅ **Structured Logging** - Serilog with console and rolling file outputs  
+
+### New: DecisionSpec Management Console
+
+The DecisionSpec Management Console provides a comprehensive CRUD interface for creating and managing decision specifications:
+
+- **Admin UI**: Web-based interface for creating, editing, and managing DecisionSpecs
+- **REST API**: Full CRUD operations with optimistic concurrency control (ETags)
+- **LLM-Assisted Drafting**: Generate spec drafts from natural language instructions using Azure OpenAI
+- **Lifecycle Management**: Track specs through Draft → In Review → Published → Retired states
+- **Validation**: Real-time validation with field-level error reporting
+- **Audit Trail**: Complete history of all changes with user attribution
+- **Soft Delete**: 30-day retention for deleted specs with restoration capability
+- **Search & Filter**: Find specs by status, owner, or search terms
+- **Version Control**: Full version history and comparison
+
+**Quick Start:**
+- **Admin UI**: `https://localhost:5001/Admin/DecisionSpecs`
+- **API Endpoints**: `https://localhost:5001/api/decisionspecs`
+- **Documentation**: See `/docs/copilot/decision-specs-llm.md` for LLM integration details
 
 ## 📋 Table of Contents
 
