@@ -25,7 +25,7 @@ public class DecisionSpecValidator : AbstractValidator<DecisionSpecDocument>
 
         RuleFor(x => x.Metadata)
             .NotNull().WithErrorCode("SPEC007").WithMessage("Metadata is required")
-            .SetValidator(new MetadataValidator());
+            .SetValidator(new MetadataValidator()!);
 
         // Validate Traits exist and are valid
         RuleFor(x => x.Traits)

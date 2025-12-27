@@ -46,11 +46,11 @@ public class TraitParser : ITraitParser
         {
             return answerType.ToLower() switch
             {
-                "string" => await ParseStringAsync(userInput, parseHint),
-                "integer" => await ParseIntegerAsync(userInput, parseHint),
-                "integer_list" => await ParseIntegerListAsync(userInput, parseHint),
-                "enum" => await ParseEnumAsync(userInput, parseHint),
-                "enum_list" => await ParseEnumListAsync(userInput, parseHint),
+                "string" => await ParseStringAsync(userInput ?? string.Empty, parseHint),
+                "integer" => await ParseIntegerAsync(userInput ?? string.Empty, parseHint),
+                "integer_list" => await ParseIntegerListAsync(userInput ?? string.Empty, parseHint),
+                "enum" => await ParseEnumAsync(userInput ?? string.Empty, parseHint),
+                "enum_list" => await ParseEnumListAsync(userInput ?? string.Empty, parseHint),
                 _ => new TraitParseResult
                 {
                     IsValid = false,
@@ -170,7 +170,7 @@ Extract the text:";
         _logger.LogInformation("ParseInteger called with input: '{Input}'", input ?? "NULL");
         
         // First try simple regex extraction
-        var numbers = System.Text.RegularExpressions.Regex.Matches(input, @"\d+")
+        var numbers = System.Text.RegularExpressions.Regex.Matches(input ?? string.Empty, @"\d+")
             .Select(m => int.Parse(m.Value))
             .ToList();
 
@@ -194,7 +194,7 @@ Extract the text:";
         if (_openAIService.IsAvailable())
         {
             _logger.LogDebug("No number found via regex, trying OpenAI parsing");
-            var llmResult = await ParseIntegerWithLLMAsync(input, parseHint);
+            var llmResult = await ParseIntegerWithLLMAsync(input ?? string.Empty, parseHint);
             if (llmResult != null)
             {
                 return llmResult;
@@ -246,7 +246,11 @@ Extract the integer:";
                 if (parsed.ToUpper() == "NONE")
                 {
                     _logger.LogInformation("LLM could not extract integer from input");
-                    return null;
+                    return new TraitParseResult
+                    {
+                        IsValid = false,
+                        ErrorReason = "Could not extract a valid integer."
+                    };
                 }
 
                 if (int.TryParse(parsed, out var extractedValue))
@@ -261,23 +265,35 @@ Extract the integer:";
                 }
 
                 _logger.LogWarning("LLM returned non-integer value: {Value}", parsed);
-                return null;
+                return new TraitParseResult
+                {
+                    IsValid = false,
+                    ErrorReason = "Could not parse as integer."
+                };
             }
 
             _logger.LogWarning("LLM failed to parse integer: {Error}", response.ErrorMessage);
-            return null;
+            return new TraitParseResult
+            {
+                IsValid = false,
+                ErrorReason = "Failed to parse integer."
+            };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error parsing integer with LLM");
-            return null;
+            return new TraitParseResult
+            {
+                IsValid = false,
+                ErrorReason = "Error parsing integer."
+            };
         }
     }
 
     private async Task<TraitParseResult> ParseIntegerListAsync(string input, string parseHint)
     {
         // First try simple regex extraction
-        var numbers = System.Text.RegularExpressions.Regex.Matches(input, @"\d+")
+        var numbers = System.Text.RegularExpressions.Regex.Matches(input ?? string.Empty, @"\d+")
             .Select(m => int.Parse(m.Value))
             .Where(n => n >= 0 && n <= 120)
             .ToList();
@@ -297,7 +313,7 @@ Extract the integer:";
         if (_openAIService.IsAvailable())
         {
             _logger.LogDebug("No numbers found via regex, trying OpenAI parsing for integer list");
-            var llmResult = await ParseIntegerListWithLLMAsync(input, parseHint);
+            var llmResult = await ParseIntegerListWithLLMAsync(input ?? string.Empty, parseHint);
             if (llmResult != null)
             {
                 return llmResult;
@@ -426,7 +442,7 @@ Extract the list of integers (comma-separated):";
         // If OpenAI is available, use it to parse the list
         if (_openAIService.IsAvailable())
         {
-            var llmResult = await ParseEnumListWithLLMAsync(input, parseHint);
+            var llmResult = await ParseEnumListWithLLMAsync(input ?? string.Empty, parseHint);
             if (llmResult != null && llmResult.IsValid)
             {
                 return llmResult;
@@ -434,7 +450,7 @@ Extract the list of integers (comma-separated):";
         }
 
         // Fallback: try to extract comma-separated values
-        var values = input.Split(new char[] { ',', ';', '&' }, StringSplitOptions.RemoveEmptyEntries)
+        var values = (input ?? string.Empty).Split(new char[] { ',', ';', '&' }, StringSplitOptions.RemoveEmptyEntries)
             .SelectMany(v => v.Split(new string[] { " and " }, StringSplitOptions.RemoveEmptyEntries))
             .Select(v => v.Trim().ToUpper().Replace(" ", "_"))
             .Where(v => !string.IsNullOrWhiteSpace(v))
@@ -475,7 +491,7 @@ Rules:
 
             var userPrompt = $@"Parse Hint: {parseHint}
 
-User Input: {input}
+User Input: {input ?? string.Empty}
 
 Extract the enum list (comma-separated):";
 
@@ -605,12 +621,20 @@ Return the appropriate enum value:";
             }
 
             _logger.LogWarning("LLM failed to parse enum: {Error}", response.ErrorMessage);
-            return null;
+            return new TraitParseResult
+            {
+                IsValid = false,
+                ErrorReason = "Could not parse enum value."
+            };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error parsing enum with LLM");
-            return null;
+            return new TraitParseResult
+            {
+                IsValid = false,
+                ErrorReason = "Error parsing enum."
+            };
         }
     }
 }

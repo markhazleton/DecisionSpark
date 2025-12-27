@@ -90,12 +90,15 @@ public class DecisionSpecDraftService
             var draft = ParseLlmResponse(response.Content, instruction, draftId);
 
             // Mark as unverified
-            draft.Metadata.Unverified = true;
+            if (draft.Metadata != null)
+            {
+                draft.Metadata.Unverified = true;
+                draft.Metadata.CreatedAt = DateTimeOffset.UtcNow;
+                draft.Metadata.UpdatedAt = DateTimeOffset.UtcNow;
+                draft.Metadata.CreatedBy = "LLM";
+                draft.Metadata.UpdatedBy = "LLM";
+            }
             draft.Status = "Draft";
-            draft.Metadata.CreatedAt = DateTimeOffset.UtcNow;
-            draft.Metadata.UpdatedAt = DateTimeOffset.UtcNow;
-            draft.Metadata.CreatedBy = "LLM";
-            draft.Metadata.UpdatedBy = "LLM";
 
             // Validate the draft (log errors but don't block)
             var validationResult = await _validator.ValidateAsync(draft, cancellationToken);
@@ -274,8 +277,11 @@ Return ONLY the JSON document, no additional text or explanation.";
             draft.SpecId ??= draftId.ToLowerInvariant();
             draft.Version ??= "V1.0.0.0";
             draft.Metadata ??= new DecisionSpecMetadata();
-            draft.Metadata.Name ??= "LLM Generated Draft";
-            draft.Metadata.Description ??= $"Generated from: {instruction.Substring(0, Math.Min(100, instruction.Length))}...";
+            if (draft.Metadata != null)
+            {
+                draft.Metadata.Name ??= "LLM Generated Draft";
+                draft.Metadata.Description ??= $"Generated from: {instruction.Substring(0, Math.Min(100, instruction.Length))}...";
+            }
             draft.Traits ??= new List<TraitDefinition>();
             draft.Outcomes ??= new List<OutcomeDefinition>();
 

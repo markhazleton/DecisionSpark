@@ -175,17 +175,18 @@ public class FileSearchIndexer
                                 var doc = JsonDocument.Parse(content);
                                 var root = doc.RootElement;
 
+                                var hasMetadata = root.TryGetProperty("metadata", out var metadataElement);
                                 var entry = new DecisionSpecIndexEntry
                                 {
                                     SpecId = specId,
                                     Version = version,
                                     Status = fileStatus,
-                                    Name = root.GetProperty("metadata").TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? specId : specId,
-                                    Owner = root.GetProperty("metadata").TryGetProperty("owner", out var ownerProp) ? ownerProp.GetString() ?? "Unknown" : "Unknown",
+                                    Name = hasMetadata && metadataElement.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? specId : specId,
+                                    Owner = hasMetadata && metadataElement.TryGetProperty("owner", out var ownerProp) ? ownerProp.GetString() ?? "Unknown" : "Unknown",
                                     TraitCount = root.TryGetProperty("traits", out var traitsProp) ? traitsProp.GetArrayLength() : 0,
                                     UpdatedAt = File.GetLastWriteTimeUtc(filePath),
-                                    HasUnverifiedDraft = root.TryGetProperty("metadata", out var metaProp) &&
-                                                         metaProp.TryGetProperty("unverified", out var unverifiedProp) &&
+                                    HasUnverifiedDraft = hasMetadata &&
+                                                         metadataElement.TryGetProperty("unverified", out var unverifiedProp) &&
                                                          unverifiedProp.GetBoolean(),
                                     ETag = etag
                                 };
