@@ -181,6 +181,7 @@ try
     
     // Register FluentValidation validators
     builder.Services.AddValidatorsFromAssemblyContaining<DecisionSpecValidator>();
+    builder.Services.AddValidatorsFromAssemblyContaining<DecisionSpark.Areas.Admin.ViewModels.DecisionSpecs.DecisionSpecEditViewModelValidator>();
     
     // Register index refresh background service
     builder.Services.AddHostedService<IndexRefreshHostedService>();
@@ -231,6 +232,13 @@ try
     app.UseAuthorization();
 
     app.MapControllers();
+    
+    // Map Admin area route
+    app.MapControllerRoute(
+        name: "admin",
+        pattern: "Admin/{controller=DecisionSpecs}/{action=Index}/{id?}",
+        defaults: new { area = "Admin" });
+    
     app.MapControllerRoute(
         name: "default",
         pattern: "{controller=Home}/{action=Index}/{id?}");

@@ -1,0 +1,336 @@
+@model DecisionSpark.Areas.Admin.ViewModels.DecisionSpecs.DecisionSpecEditViewModel
+@{
+    ViewData["Title"] = Model.IsNewSpec ? "Create Decision Spec" : $"Edit {Model.SpecId}";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="@Url.Action("Index")">Decision Specs</a></li>
+                    <li class="breadcrumb-item active">@(Model.IsNewSpec ? "Create" : "Edit")</li>
+                </ol>
+            </nav>
+            <h1 class="h2">
+                @if (Model.IsNewSpec)
+                {
+                    <i class="bi bi-plus-circle"></i> <text>Create Decision Spec</text>
+                }
+                else
+                {
+                    <i class="bi bi-pencil"></i> <text>Edit @Model.SpecId</text>
+                }
+            </h1>
+        </div>
+        <div class="col-auto">
+            <a href="@Url.Action("Index")" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to List
+            </a>
+        </div>
+    </div>
+
+    @if (Model.ShowConcurrencyConflict)
+    {
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <h5 class="alert-heading"><i class="bi bi-exclamation-triangle"></i> Concurrency Conflict</h5>
+            <p>This DecisionSpec has been modified by another user since you loaded it. Please review the current version and re-apply your changes.</p>
+            <div class="mt-3">
+                <a href="@Url.Action("Edit", new { specId = Model.SpecId })" class="btn btn-warning">
+                    <i class="bi bi-arrow-clockwise"></i> Reload Current Version
+                </a>
+                <button type="button" class="btn btn-outline-warning" data-bs-dismiss="alert">
+                    Continue Editing (Risk Overwrite)
+                </button>
+            </div>
+        </div>
+    }
+
+    <form asp-action="Save" method="post" id="editForm" novalidate>
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="ETag" />
+        <input type="hidden" asp-for="ShowConcurrencyConflict" value="false" />
+
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Basic Information Card -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Basic Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label asp-for="SpecId" class="form-label">Spec ID *</label>
+                                <input asp-for="SpecId" class="form-control" 
+                                       @(Model.IsNewSpec ? "" : "readonly")
+                                       placeholder="e.g., customer-onboarding" />
+                                <span asp-validation-for="SpecId" class="text-danger"></span>
+                                <small class="form-text text-muted">Lowercase letters, numbers, and hyphens only</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="Version" class="form-label">Version *</label>
+                                <input asp-for="Version" class="form-control" 
+                                       placeholder="e.g., 2025.12.1" />
+                                <span asp-validation-for="Version" class="text-danger"></span>
+                                <small class="form-text text-muted">Format: major.minor.patch</small>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-12">
+                                <label asp-for="Metadata.Name" class="form-label">Name *</label>
+                                <input asp-for="Metadata.Name" class="form-control" 
+                                       placeholder="e.g., Customer Onboarding Decision" />
+                                <span asp-validation-for="Metadata.Name" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-12">
+                                <label asp-for="Metadata.Description" class="form-label">Description</label>
+                                <textarea asp-for="Metadata.Description" class="form-control" rows="3"
+                                          placeholder="Describe the purpose of this decision spec..."></textarea>
+                                <span asp-validation-for="Metadata.Description" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-12">
+                                <label asp-for="Metadata.Tags" class="form-label">Tags</label>
+                                <input type="text" id="tagsInput" class="form-control" 
+                                       placeholder="Add tags (comma-separated)..." />
+                                <div id="tagsDisplay" class="mt-2"></div>
+                                <input type="hidden" asp-for="Metadata.Tags" id="tagsHidden" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Questions Card -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-question-circle"></i> Questions</h5>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="addQuestion()">
+                            <i class="bi bi-plus"></i> Add Question
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="questionsContainer">
+                            @for (int i = 0; i < Model.Questions.Count; i++)
+                            {
+                                <partial name="_QuestionEditor" model="Model.Questions[i]" view-data='new ViewDataDictionary(ViewData) { { "Index", i } }' />
+                            }
+                            @if (!Model.Questions.Any())
+                            {
+                                <p class="text-muted text-center py-3">No questions added yet. Click "Add Question" to get started.</p>
+                            }
+                        </div>
+                        <span asp-validation-for="Questions" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <!-- Outcomes Card -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-bullseye"></i> Outcomes</h5>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="addOutcome()">
+                            <i class="bi bi-plus"></i> Add Outcome
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="outcomesContainer">
+                            @for (int i = 0; i < Model.Outcomes.Count; i++)
+                            {
+                                <partial name="_OutcomeEditor" model="Model.Outcomes[i]" view-data='new ViewDataDictionary(ViewData) { { "Index", i } }' />
+                            }
+                            @if (!Model.Outcomes.Any())
+                            {
+                                <p class="text-muted text-center py-3">No outcomes added yet. Click "Add Outcome" to get started.</p>
+                            }
+                        </div>
+                        <span asp-validation-for="Outcomes" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-4">
+                    <a href="@Url.Action("Index")" class="btn btn-outline-secondary">
+                        <i class="bi bi-x"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> @(Model.IsNewSpec ? "Create" : "Save Changes")
+                    </button>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <!-- Status & Info Sidebar -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-gear"></i> Status</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label asp-for="Status" class="form-label">Current Status</label>
+                            <select asp-for="Status" class="form-select">
+                                <option value="Draft">Draft</option>
+                                <option value="InReview">In Review</option>
+                                <option value="Published">Published</option>
+                                <option value="Retired">Retired</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Validation Summary -->
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="card border-danger mb-4">
+                        <div class="card-header bg-danger text-white">
+                            <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Validation Errors</h6>
+                        </div>
+                        <div class="card-body">
+                            <div asp-validation-summary="All" class="text-danger"></div>
+                        </div>
+                    </div>
+                }
+
+                <!-- Help Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-lightbulb"></i> Tips</h6>
+                    </div>
+                    <div class="card-body">
+                        <ul class="small mb-0">
+                            <li>Use clear, concise prompts for questions</li>
+                            <li>Question IDs should be unique and descriptive</li>
+                            <li>Add help text to guide users</li>
+                            <li>Define selection rules for outcomes</li>
+                            <li>Save as Draft to continue editing later</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/decisionspecs-admin.js"></script>
+    <script>
+        // Initialize tags
+        initializeTags(@Html.Raw(Json.Serialize(Model.Metadata.Tags)));
+
+        // Question counter for new questions
+        let questionIndex = @Model.Questions.Count;
+        let outcomeIndex = @Model.Outcomes.Count;
+
+        function addQuestion() {
+            // This will be implemented in decisionspecs-admin.js
+            const container = document.getElementById('questionsContainer');
+            const placeholder = container.querySelector('p.text-muted');
+            if (placeholder) placeholder.remove();
+            
+            // Add new question editor (simplified for now)
+            const newQuestion = `
+                <div class="question-editor border rounded p-3 mb-3" data-index="${questionIndex}">
+                    <div class="d-flex justify-content-between mb-3">
+                        <h6>Question ${questionIndex + 1}</h6>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeQuestion(${questionIndex})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    <input type="text" name="Questions[${questionIndex}].QuestionId" class="form-control mb-2" placeholder="Question ID" required />
+                    <input type="text" name="Questions[${questionIndex}].Prompt" class="form-control mb-2" placeholder="Question prompt" required />
+                    <select name="Questions[${questionIndex}].Type" class="form-select mb-2">
+                        <option value="SingleSelect">Single Select</option>
+                        <option value="MultiSelect">Multi Select</option>
+                        <option value="Text">Text</option>
+                        <option value="Number">Number</option>
+                        <option value="Date">Date</option>
+                    </select>
+                    <input type="text" name="Questions[${questionIndex}].HelpText" class="form-control" placeholder="Help text (optional)" />
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', newQuestion);
+            questionIndex++;
+        }
+
+        function removeQuestion(index) {
+            const editor = document.querySelector(`.question-editor[data-index="${index}"]`);
+            if (editor) editor.remove();
+        }
+
+        function addOutcome() {
+            const container = document.getElementById('outcomesContainer');
+            const placeholder = container.querySelector('p.text-muted');
+            if (placeholder) placeholder.remove();
+            
+            const newOutcome = `
+                <div class="outcome-editor border rounded p-3 mb-3" data-index="${outcomeIndex}">
+                    <div class="d-flex justify-content-between mb-3">
+                        <h6>Outcome ${outcomeIndex + 1}</h6>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeOutcome(${outcomeIndex})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    <input type="text" name="Outcomes[${outcomeIndex}].OutcomeId" class="form-control mb-2" placeholder="Outcome ID" required />
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', newOutcome);
+            outcomeIndex++;
+        }
+
+        function removeOutcome(index) {
+            const editor = document.querySelector(`.outcome-editor[data-index="${index}"]`);
+            if (editor) editor.remove();
+        }
+
+        function initializeTags(tags) {
+            const tagsDisplay = document.getElementById('tagsDisplay');
+            const tagsHidden = document.getElementById('tagsHidden');
+            
+            tags.forEach(tag => {
+                addTagBadge(tag);
+            });
+
+            document.getElementById('tagsInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault();
+                    const value = this.value.trim();
+                    if (value && !tags.includes(value)) {
+                        tags.push(value);
+                        addTagBadge(value);
+                        updateTagsHidden(tags);
+                    }
+                    this.value = '';
+                }
+            });
+        }
+
+        function addTagBadge(tag) {
+            const tagsDisplay = document.getElementById('tagsDisplay');
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-secondary me-2';
+            badge.innerHTML = `${tag} <i class="bi bi-x-circle" style="cursor:pointer" onclick="removeTag('${tag}')"></i>`;
+            tagsDisplay.appendChild(badge);
+        }
+
+        function removeTag(tag) {
+            const tags = @Html.Raw(Json.Serialize(Model.Metadata.Tags));
+            const index = tags.indexOf(tag);
+            if (index > -1) tags.splice(index, 1);
+            
+            document.getElementById('tagsDisplay').innerHTML = '';
+            tags.forEach(t => addTagBadge(t));
+            updateTagsHidden(tags);
+        }
+
+        function updateTagsHidden(tags) {
+            document.getElementById('tagsHidden').value = JSON.stringify(tags);
+        }
+    </script>
+}
